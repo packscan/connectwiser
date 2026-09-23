@@ -1,0 +1,3318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0f1419" />
+  <title>PackScan — Pick & Pack</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script src="/config.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><img class="logo-img" src="logo.png" alt="PackScan" width="40" height="40" /> PackScan</div>
+      <span class="mode-pill" id="modePill">Demo mode</span>
+      <button class="ghost-btn" id="refreshBtn">Refresh</button>
+      <button class="ghost-btn" id="historyBtn">History</button>
+      <button class="ghost-btn" id="aboutBtn">About</button>
+      <button class="ghost-btn" id="settingsBtn">Settings</button>
+    </header>
+    <div id="fedexDemoBanner" class="demo-banner" style="display:none;">
+      Using built-in FedEx <strong>sandbox</strong> demo credentials — no real labels or charges. Enter your own keys in Settings to use your account.
+    </div>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="sidebar-tools">
+          <div class="stats">
+            <div class="stat">Open orders <b id="orderCount">0</b></div>
+          </div>
+          <input class="search" id="search" placeholder="Search order, name, SKU…" autocomplete="off" />
+          <div class="filters">
+            <button class="chip active" data-filter="open">Needs Picking</button>
+            <button class="chip" data-filter="done">Complete</button>
+            <button class="chip" data-filter="all">All</button>
+          </div>
+        </div>
+        <div class="order-list" id="orderList"></div>
+      </aside>
+
+      <main class="main">
+        <form class="scan-bar" id="scanForm" autocomplete="off">
+          <input id="scanInput" placeholder="Scan barcode / SKU and hit Enter" autocomplete="off" />
+          <div class="pack-toggle" id="packToggle" role="group" aria-label="Pack size">
+            <button type="button" class="pack-btn active" data-pack="EA">EA</button>
+            <button type="button" class="pack-btn" data-pack="C1">C1</button>
+            <button type="button" class="pack-btn" data-pack="C2">C2</button>
+            <button type="button" class="pack-btn" data-pack="C3">C3</button>
+          </div>
+          <button type="button" class="primary-btn" id="cameraBtn">Scan With Camera</button>
+        </form>
+        <button type="button" class="scan-status" id="scanStatus">Scanner ready</button>
+        <div id="detail"></div>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div class="modal-bg warn-modal" id="warnModal">
+    <div class="modal warn-dialog" role="alertdialog" aria-modal="true">
+      <h2 id="warnModalTitle">Not on this order</h2>
+      <p class="warn-text" id="warnModalText">Not on this order</p>
+      <p class="help">Press OK or any key to continue.</p>
+      <div class="row-actions">
+        <button type="button" class="primary-btn" id="warnOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="settingsModal">
+    <div class="modal settings-modal">
+      <div class="settings-title">
+        <div>
+          <h2>Settings</h2>
+          <p class="help">Open a section to make changes. Save applies everything.</p>
+        </div>
+        <button class="ghost-btn" id="closeSettingsTop" type="button" aria-label="Close Settings">Close</button>
+      </div>
+
+      <div class="settings-sections">
+        <details class="settings-sub" open>
+          <summary><span>General</span><span class="settings-summary-note">Display and workflow</span></summary>
+          <div class="settings-body settings-grid">
+            <div class="field">
+              <label>Display mode</label>
+              <select id="themeInput" autocomplete="off">
+                <option value="default">Default</option>
+                <option value="light">Light Mode</option>
+                <option value="dark">Dark Mode</option>
+                <option value="colorful">Colorful (Red White and Blue)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Mode</label>
+              <select id="modeInput" autocomplete="off">
+                <option value="demo">Demo (sample orders, no Shopify writes)</option>
+                <option value="live">Live Shopify</option>
+              </select>
+            </div>
+            <label class="settings-check"><input type="checkbox" id="notifyInput" autocomplete="off" checked /> Email customer when fulfilled</label>
+            <label class="settings-check"><input type="checkbox" id="soundInput" autocomplete="off" checked /> Scan beep</label>
+            <label class="settings-check"><input type="checkbox" id="viewBarcodeInput" autocomplete="off" checked /> View barcode</label>
+            <label class="settings-check"><input type="checkbox" id="viewPackingListInput" autocomplete="off" checked /> View packing list</label>
+            <div class="field">
+              <label for="orderLimitInput">Orders to load</label>
+              <select id="orderLimitInput" autocomplete="off">
+                <option value="50">50 orders</option>
+                <option value="100" selected>100 orders</option>
+                <option value="150">150 orders</option>
+                <option value="250">250 orders</option>
+                <option value="500">500 orders</option>
+              </select>
+              <p class="help">Increase this if open orders are missing from the list. Loading more orders takes longer to refresh.</p>
+            </div>
+          </div>
+        </details>
+
+        <details class="settings-sub" open>
+          <summary><span>Printing &amp; labels</span><span class="settings-summary-note">Zebra and Shopify Shipping</span></summary>
+          <div class="settings-body">
+            <div class="settings-checks">
+              <label class="settings-check"><input type="checkbox" id="autoPrintInput" autocomplete="off" checked /> Auto-print 4×6 label after FedEx creates it</label>
+              <label class="settings-check"><input type="checkbox" id="fedexThermalInput" autocomplete="off" /> FedEx label is for a Zebra thermal printer (ZPLII, 4×6)</label>
+              <label class="settings-check"><input type="checkbox" id="shopifyShipInput" autocomplete="off" /> Use Shopify Shipping</label>
+            </div>
+            <div class="field">
+              <label for="zebraPrinterInput">Zebra printer</label>
+              <div class="settings-inline">
+                <select id="zebraPrinterInput" autocomplete="off">
+                  <option value="">Select a printer</option>
+                </select>
+                <button class="ghost-btn" id="discoverZebraBtn" type="button">Discover</button>
+                <button class="ghost-btn" id="testZebraBtn" type="button">Test Printer</button>
+              </div>
+            </div>
+            <div class="settings-grid">
+              <div class="field">
+                <label>UPS label rotation</label>
+                <select id="labelRotUpsInput" autocomplete="off">
+                  <option value="0">0° — as sent</option>
+                  <option value="90" selected>90° clockwise</option>
+                  <option value="180">180°</option>
+                  <option value="270">270° clockwise</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>FedEx label rotation</label>
+                <select id="labelRotFedexInput" autocomplete="off">
+                  <option value="0" selected>0° — as sent</option>
+                  <option value="90">90° clockwise</option>
+                  <option value="180">180°</option>
+                  <option value="270">270° clockwise</option>
+                </select>
+              </div>
+            </div>
+            <details class="settings-help">
+              <summary>Printer setup help</summary>
+              <p class="help">Install and run Zebra Browser Print on the packing computer. If Discover shows "Failed to fetch" on app.packscan.shop, click the padlock in Chrome → Site settings → Permissions → allow "Local network access" or "Apps on your local network," then reload. PackScan uses Browser Print's local HTTP service, so no localhost certificate approval is needed.</p>
+              <p class="help">For browser printing, select the 4×6 printer, turn off “Fit to page,” and use 100% scale. Setting it as the Windows default avoids choosing it each time.</p>
+            </details>
+            <p class="help">Shopify Shipping uses Shopify’s discounted USPS / UPS / DHL labels and disables the carrier API fields below. It cannot buy FedEx labels.</p>
+          </div>
+        </details>
+
+        <details class="settings-sub" id="defaultsPanel">
+          <summary><span>Pack sizes</span><span class="settings-summary-note">EA, C1, C2, C3</span></summary>
+          <div class="settings-body">
+            <p class="help">One scan adds this many units.</p>
+            <div class="pack-defaults-row">
+              <div class="field"><label>EA</label><input id="packEaInput" type="number" min="1" step="1" autocomplete="off" /></div>
+              <div class="field"><label>C1</label><input id="packC1Input" type="number" min="1" step="1" autocomplete="off" /></div>
+              <div class="field"><label>C2</label><input id="packC2Input" type="number" min="1" step="1" autocomplete="off" /></div>
+              <div class="field"><label>C3</label><input id="packC3Input" type="number" min="1" step="1" autocomplete="off" /></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="settings-sub" id="boxesPanel">
+          <summary><span>Boxes</span><span class="settings-summary-note">Saved dimensions and weights</span></summary>
+          <div class="settings-body">
+            <p class="help">Up to 10 saved cartons. Selecting a box fills L / W / H and adds its empty weight.</p>
+            <div id="boxDefaultsList"></div>
+          </div>
+        </details>
+
+        <details class="settings-sub">
+          <summary><span>Ship-from address</span><span class="settings-summary-note">Used on carrier labels</span></summary>
+          <div class="settings-body">
+            <div class="settings-grid">
+              <div class="field"><label>Company</label><input id="fromNameInput" placeholder="Child to Cherish" autocomplete="off" name="packscan-from-name" /></div>
+              <div class="field"><label>Phone (digits)</label><input id="fromPhoneInput" placeholder="7145550100" autocomplete="off" name="packscan-from-phone" inputmode="tel" /></div>
+            </div>
+            <div class="field"><label>Street</label><input id="fromStreetInput" autocomplete="off" name="packscan-from-street" /></div>
+            <div class="field">
+              <label>City / State / ZIP</label>
+              <div class="settings-address">
+                <input id="fromCityInput" placeholder="City" autocomplete="off" name="packscan-from-city" />
+                <input id="fromStateInput" placeholder="CA" autocomplete="off" name="packscan-from-state" maxlength="2" />
+                <input id="fromZipInput" placeholder="92821" autocomplete="off" name="packscan-from-zip" />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="settings-sub" id="carrierApiBlock">
+          <summary><span>Carrier accounts</span><span class="settings-summary-note">FedEx, UPS, Stamps.com</span></summary>
+          <div class="settings-body">
+            <details class="settings-provider">
+              <summary>FedEx</summary>
+              <div class="settings-grid">
+                <div class="field"><label>Production API key</label><input id="fedexKeyInput" autocomplete="off" /></div>
+                <div class="field"><label>Production secret key</label><input id="fedexSecretInput" type="password" autocomplete="off" /></div>
+              </div>
+              <div class="field"><label>Production account number</label><input id="fedexAccountInput" autocomplete="off" /></div>
+              <label class="settings-check"><input type="checkbox" id="fedexSandboxInput" autocomplete="off" /> Use FedEx sandbox (test keys)</label>
+              <p class="help">Sandbox uses the protected server test account. Production credentials remain unchanged.</p>
+            </details>
+            <details class="settings-provider">
+              <summary>UPS</summary>
+              <p class="help">Create an app at developer.ups.com with Rating and Shipping enabled.</p>
+              <div class="settings-grid">
+                <div class="field"><label>Client ID</label><input id="upsIdInput" autocomplete="off" /></div>
+                <div class="field"><label>Client secret</label><input id="upsSecretInput" type="password" autocomplete="off" /></div>
+              </div>
+              <div class="field"><label>Account number</label><input id="upsAccountInput" autocomplete="off" /></div>
+              <label class="settings-check"><input type="checkbox" id="upsSandboxInput" autocomplete="off" /> Use UPS test (CIE)</label>
+            </details>
+            <details class="settings-provider">
+              <summary>Stamps.com (USPS)</summary>
+              <p class="help">Use your Stamps.com login and developer Integration ID.</p>
+              <div class="settings-grid">
+                <div class="field"><label>Username</label><input id="stampsUserInput" autocomplete="off" /></div>
+                <div class="field"><label>Password</label><input id="stampsPassInput" type="password" autocomplete="off" /></div>
+              </div>
+              <div class="field"><label>Integration ID</label><input id="stampsIdInput" placeholder="GUID from Stamps developer account" autocomplete="off" /></div>
+              <label class="settings-check"><input type="checkbox" id="stampsSandboxInput" autocomplete="off" /> Use Stamps test server</label>
+            </details>
+          </div>
+        </details>
+
+        <details class="settings-sub">
+          <summary><span>Enabled shipping services</span><span class="settings-summary-note">Rates shown during packing</span></summary>
+          <div class="settings-body">
+            <p class="help">Unchecked services are hidden and filtered out of rate results.</p>
+            <div class="svc-grid" id="svcGrid">
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_GROUND" autocomplete="off" checked /> FedEx Ground</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_HOME" autocomplete="off" checked /> FedEx Home Delivery</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_EXPRESS_SAVER" autocomplete="off" checked /> FedEx Express Saver</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_2DAY" autocomplete="off" checked /> FedEx 2Day</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_2DAY_AM" autocomplete="off" checked /> FedEx 2Day AM</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_STANDARD_OVERNIGHT" autocomplete="off" checked /> FedEx Standard Overnight</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_PRIORITY_OVERNIGHT" autocomplete="off" checked /> FedEx Priority Overnight</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="FEDEX_FIRST_OVERNIGHT" autocomplete="off" checked /> FedEx First Overnight</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="UPS_GROUND" autocomplete="off" checked /> UPS Ground</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="UPS_3DAY" autocomplete="off" checked /> UPS 3 Day Select</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="UPS_2DAY" autocomplete="off" checked /> UPS 2nd Day Air</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="UPS_NEXT" autocomplete="off" checked /> UPS Next Day Air</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="USPS_GA" autocomplete="off" checked /> USPS Ground Advantage</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="USPS_PRIORITY" autocomplete="off" checked /> USPS Priority Mail</label>
+              <label><input type="checkbox" class="svc-toggle" data-svc="USPS_EXPRESS" autocomplete="off" checked /> USPS Priority Mail Express</label>
+            </div>
+          </div>
+        </details>
+
+        <details class="settings-sub">
+          <summary><span>Developer setup help</span><span class="settings-summary-note">Shopify app configuration</span></summary>
+          <div class="settings-body help">
+            <ol>
+              <li>Install PackScan from Shopify Admin for the store you are packing.</li>
+              <li>PackScan connects through the store’s approved Shopify OAuth installation.</li>
+            </ol>
+          </div>
+        </details>
+      </div>
+
+      <div class="actions settings-actions">
+        <button class="ghost-btn" id="defaultsBtn" type="button">Defaults</button>
+        <button class="ghost-btn" id="boxesBtn" type="button">Boxes</button>
+        <button class="ghost-btn" id="exportSettings">Export Settings</button>
+        <button class="ghost-btn" id="importSettings">Import Settings</button>
+        <input type="file" id="importSettingsFile" accept="application/json,.json" autocomplete="off" hidden />
+        <button class="ghost-btn" id="testConn">Test Connection</button>
+        <button class="ghost-btn" id="closeSettings">Cancel</button>
+        <button class="primary-btn" id="saveSettings">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="historyModal">
+    <div class="modal modal-wide">
+      <h2>Label History <span class="help">(last 24 hours)</span></h2>
+      <div id="historyBody">
+        <p class="meta">Loading…</p>
+      </div>
+      <div class="actions">
+        <button class="ghost-btn" id="closeHistory" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="aboutModal">
+    <div class="modal">
+      <img class="about-logo" src="logo.png" alt="PackScan logo" width="64" height="64" />
+      <h2>About PackScan</h2>
+      <p>PackScan is a pick-and-pack tool for searching orders, scanning products, and preparing shipments.</p>
+      <p><a class="about-link" href="https://www.packscan.shop" target="_blank" rel="noopener">Visit www.packscan.shop</a></p>
+      <p>Designed, developed and supported in the U.S.A.</p>
+      <p class="help">© 2026 LoweCo, LLC. PackScan™ is a trademark of LoweCo, LLC. All rights reserved.</p>
+      <p class="help">Shopify, FedEx, UPS, USPS, and other company names and trademarks belong to their respective owners. PackScan is not affiliated with or endorsed by those companies unless explicitly stated.</p>
+      <div class="actions">
+        <button class="primary-btn" id="closeAbout" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="modal-bg" id="fulfillModal">
+    <div class="modal">
+      <h2>Fulfill all</h2>
+      <p class="help">Record carrier and tracking on the Shopify order. Tracking can be left blank.</p>
+      <div class="field">
+        <label>Carrier</label>
+        <select id="fulfillCarrier" autocomplete="off">
+          <option value="FedEx">FedEx</option>
+          <option value="UPS">UPS</option>
+          <option value="USPS">USPS</option>
+          <option value="DHL">DHL</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="field" id="otherCarrierWrap" style="display:none">
+        <label>Carrier name</label>
+        <input id="fulfillCarrierOther" placeholder="OnTrac, Spee-Dee, local courier…" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Tracking number</label>
+        <input id="fulfillTracking" placeholder="7946…" autocomplete="off" />
+      </div>
+      <div class="actions">
+        <button class="ghost-btn" id="cancelFulfillAll">Cancel</button>
+        <button class="ok-btn" id="confirmFulfillAll">Fulfill Order</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="autoFillModal">
+    <div class="modal">
+      <h2>Start Auto-fill</h2>
+      <p class="help">Choose the box size and total number of units for each carton. When a carton reaches that quantity, PackScan prints its label and then closes the carton.</p>
+      <div class="field">
+        <label>Box size</label>
+        <select id="autoFillBox" autocomplete="off"></select>
+      </div>
+      <div class="field">
+        <label>Units per carton</label>
+        <input id="autoFillQty" type="number" min="1" step="1" value="1" autocomplete="off" />
+      </div>
+      <div class="actions">
+        <button class="ghost-btn" id="cancelAutoFill" type="button">Cancel</button>
+        <button class="ok-btn" id="confirmAutoFill" type="button">Start Auto-fill</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="scanModal">
+    <div class="modal scan-modal">
+      <h2>Camera scan</h2>
+      <p class="help">Point the back camera at the barcode. Keep this open and scan every unit on the order. HTTPS is required on phones.</p>
+      <div id="reader"></div>
+      <div class="actions">
+        <button class="ghost-btn" id="closeScan">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    <script>
+window.DEMO_ORDERS = [
+  {
+    id: "demo-10041",
+    name: "#10041",
+    email: "maya.r@example.com",
+    createdAt: "2026-09-02T16:12:00-07:00",
+    displayFulfillmentStatus: "UNFULFILLED",
+    customer: { firstName: "Maya", lastName: "Reyes" },
+    shippingAddress: { address1: "214 N Pomona Ave", city: "Fullerton", provinceCode: "CA", zip: "92832" },
+    note: "Pickup — Fullerton",
+    channel: "Online Store",
+    fulfillmentOrders: [
+      {
+        id: "demo-fo-10041",
+        status: "OPEN",
+        locationName: "Perine Lowe Inc",
+        lineItems: [
+          { id: "d-li-1", title: "Big's Classic Tee — Black / L", sku: "BG-TEE-BLK-L", barcode: "012345678901", qty: 2, remaining: 2, weightLb: 0.75, image: null },
+          { id: "d-li-2", title: "House Hot Sauce 5oz", sku: "BG-SAUCE-01", barcode: "012345678918", qty: 1, remaining: 1, weightLb: 1, image: null },
+          { id: "d-li-3", title: "Pint Glass — Logo", sku: "BG-PINT-01", barcode: "012345678925", qty: 2, remaining: 2, weightLb: 0.8, image: null }
+        ]
+      }
+    ]
+  },
+  {
+    id: "demo-10042",
+    name: "#10042",
+    email: "chris.n@example.com",
+    createdAt: "2026-09-02T18:40:00-07:00",
+    displayFulfillmentStatus: "PARTIAL",
+    customer: { firstName: "Chris", lastName: "Nguyen" },
+    shippingAddress: { address1: "123 Demo Lane", city: "Testville", provinceCode: "CA", zip: "90000" },
+    note: "Ship UPS Ground",
+    channel: "Faire",
+    fulfillmentOrders: [
+      {
+        id: "demo-fo-10042",
+        status: "IN_PROGRESS",
+        locationName: "Perine Lowe Inc",
+        lineItems: [
+          { id: "d-li-4", title: "Big's Hoodie — Grey / M", sku: "BG-HOOD-GRY-M", barcode: "012345678932", qty: 1, remaining: 1, weightLb: 1.25, image: null },
+          { id: "d-li-5", title: "Gift Card $50", sku: "BG-GC-50", barcode: "GIFT50", qty: 1, remaining: 0, weightLb: 0, image: null },
+          { id: "d-li-fee1", title: "Faire commission", sku: "", barcode: "", qty: 1, remaining: 1, weightLb: 0, requiresShipping: false, tracked: false, image: null },
+          { id: "d-li-fee2", title: "Faire payment processing fee", sku: "", barcode: "", qty: 1, remaining: 1, weightLb: 0, requiresShipping: false, tracked: false, image: null }
+        ]
+      }
+    ]
+  },
+  {
+    id: "demo-10043",
+    name: "#10043",
+    email: "sam.p@example.com",
+    createdAt: "2026-09-03T09:05:00-07:00",
+    displayFulfillmentStatus: "UNFULFILLED",
+    customer: { firstName: "Sam", lastName: "Patel" },
+    shippingAddress: { address1: "8840 W Cactus Rd", city: "Peoria", provinceCode: "AZ", zip: "85381" },
+    note: "Peoria location pickup",
+    fulfillmentOrders: [
+      {
+        id: "demo-fo-10043",
+        status: "OPEN",
+        locationName: "Big's Peoria",
+        lineItems: [
+          { id: "d-li-6", title: "Kids Tee — Red / Youth M", sku: "BG-KTEE-RED-YM", barcode: "012345678949", qty: 1, remaining: 1, weightLb: 0.5, image: null },
+          { id: "d-li-7", title: "Sticker Pack", sku: "BG-STICK-01", barcode: "012345678956", qty: 3, remaining: 3, weightLb: 0.05, image: null }
+        ]
+      }
+    ]
+  }
+];
+
+const ShopifyAPI = (() => {
+  const ORDERS_LIST_QUERY = `
+    query PackScanOrderList($query: String!, $cursor: String) {
+      orders(first: 25, after: $cursor, query: $query, sortKey: CREATED_AT, reverse: true) {
+        pageInfo { hasNextPage endCursor }
+        edges {
+          node {
+            id
+            name
+            email
+            createdAt
+            displayFulfillmentStatus
+            note
+            sourceName
+            app { name }
+            channelInformation { displayName channelDefinition { channelName handle } }
+            shippingAddress { firstName lastName name company phone address1 address2 city provinceCode zip countryCodeV2 }
+            shippingLine { title code originalPriceSet { shopMoney { amount currencyCode } } }
+          }
+        }
+      }
+    }
+  `;
+
+  const ORDERS_DETAIL_QUERY = `
+    query PackScanOrderDetail($ids: [ID!]!) {
+      nodes(ids: $ids) {
+        ... on Order {
+          id
+          name
+          email
+          createdAt
+          displayFulfillmentStatus
+          note
+          sourceName
+          app { name }
+          channelInformation { displayName channelDefinition { channelName handle } }
+          shippingAddress { firstName lastName name company phone address1 address2 city provinceCode zip countryCodeV2 }
+          shippingLine { title code originalPriceSet { shopMoney { amount currencyCode } } }
+          fulfillments(first: 20) {
+            id
+            status
+          }
+          fulfillmentOrders(first: 5, displayable: true) {
+            edges {
+              node {
+                id
+                status
+                assignedLocation { name }
+                lineItems(first: 25) {
+                  edges {
+                    node {
+                      id
+                      remainingQuantity
+                      totalQuantity
+                      lineItem {
+                        id
+                        title
+                        sku
+                        requiresShipping
+                        image { url }
+                        product { productType title }
+                        variant {
+                          barcode
+                          sku
+                          image { url }
+                          inventoryQuantity
+                          inventoryItem {
+                            tracked
+                            measurement {
+                              weight { value unit }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const FULFILL_MUTATION = `
+    mutation PackScanFulfill($fulfillment: FulfillmentInput!) {
+      fulfillmentCreate(fulfillment: $fulfillment) {
+        fulfillment { id status }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const CANCEL_FULFILLMENT = `
+    mutation PackScanUnfill($id: ID!) {
+      fulfillmentCancel(id: $id) {
+        fulfillment { id status }
+        userErrors { field message }
+      }
+    }
+  `;
+
+  const SHOP_QUERY = `query { shop { name myshopifyDomain primaryDomain { url } } }`;
+
+  function settings() {
+    return {
+      notify: localStorage.getItem("packscan_notify") !== "0",
+      orderLimit: Number(localStorage.getItem("packscan_order_limit")) || 100,
+    };
+  }
+
+  function configured() {
+    return Boolean(window.PACKSCAN_HOSTED && window.PACKSCAN_SHOP);
+  }
+
+  async function request(query, variables) {
+    if (!configured()) {
+      throw new Error("Install PackScan from Shopify Admin to connect this browser.");
+    }
+    const res = await fetch("/api/shopify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+    });
+    let json;
+    try {
+      json = await res.json();
+    } catch {
+      throw new Error("Could not reach the PackScan proxy. Start the local server and open http://localhost:8787");
+    }
+    if (!res.ok) {
+      const msg = json.error || json.errors?.[0]?.message || `Shopify HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join("; "));
+    return json.data;
+  }
+
+  function weightToLb(w) {
+    if (!w || w.value == null || Number(w.value) <= 0) return null;
+    const v = Number(w.value);
+    const u = String(w.unit || "POUNDS").toUpperCase();
+    if (u.startsWith("GRAM")) return v / 453.59237;
+    if (u.startsWith("KILO")) return v * 2.20462262;
+    if (u.startsWith("OUNCE") || u === "OZ") return v / 16;
+    return v;
+  }
+
+  function normalizeOrder(node) {
+    if (!node || !node.id) {
+      return {
+        id: "",
+        name: "",
+        fulfillmentOrders: [],
+        displayFulfillmentStatus: "",
+      };
+    }
+    const fos = (node.fulfillmentOrders?.edges || []).map((e) => {
+      const fo = e.node;
+      return {
+        id: fo.id,
+        status: fo.status,
+        locationName: fo.assignedLocation?.name || "",
+        lineItems: (fo.lineItems?.edges || []).map((li) => {
+          const n = li.node;
+          const item = n.lineItem || {};
+          const variant = item.variant || {};
+          const codes = [...new Set([variant.barcode, variant.sku, item.sku]
+            .map((code) => String(code || "").trim())
+            .filter(Boolean))];
+          return {
+            id: n.id,
+            lineItemId: item.id,
+            title: item.title || "Item",
+            sku: variant.sku || item.sku || "",
+            barcode: (variant.barcode || "").trim(),
+            codes,
+            qty: n.totalQuantity,
+            remaining: n.remainingQuantity,
+            onHand: variant.inventoryQuantity,
+            weightLb: weightToLb(variant.inventoryItem?.measurement?.weight),
+            image: variant.image?.url || item.image?.url || null,
+            requiresShipping: item.requiresShipping !== false,
+            tracked: variant.inventoryItem?.tracked !== false,
+            productType: item.product?.productType || "",
+          };
+        }),
+      };
+    });
+    const ch = node.channelInformation || {};
+    const channel =
+      ch.displayName ||
+      ch.channelDefinition?.channelName ||
+      node.app?.name ||
+      node.sourceName ||
+      "Shopify";
+    return {
+      id: node.id,
+      name: node.name,
+      email: node.email,
+      createdAt: node.createdAt,
+      displayFulfillmentStatus: node.displayFulfillmentStatus,
+      note: node.note,
+      tags: node.tags,
+      customer: node.customer,
+      shippingAddress: node.shippingAddress,
+      shippingLine: node.shippingLine || null,
+      fulfillments: (Array.isArray(node.fulfillments) ? node.fulfillments : node.fulfillments?.nodes || node.fulfillments?.edges?.map((e) => e.node) || []).filter(Boolean),
+      channel,
+      sourceName: node.sourceName || "",
+      fulfillmentOrders: fos,
+    };
+  }
+
+  async function testConnection() {
+    const data = await request(SHOP_QUERY);
+    return data.shop;
+  }
+
+  async function fetchDetails(ids) {
+    const out = [];
+    for (let i = 0; i < ids.length; i += 8) {
+      const chunk = ids.slice(i, i + 8);
+      const data = await request(ORDERS_DETAIL_QUERY, { ids: chunk });
+      out.push(...(data.nodes || []).filter(Boolean).map(normalizeOrder));
+    }
+    return out;
+  }
+
+  async function collectOrderIds(query, pages) {
+    let cursor = null;
+    const ids = [];
+    for (let i = 0; i < pages; i++) {
+      const data = await request(ORDERS_LIST_QUERY, { query, cursor });
+      const conn = data.orders;
+      for (const edge of conn.edges) ids.push(edge.node.id);
+      if (!conn.pageInfo.hasNextPage) break;
+      cursor = conn.pageInfo.endCursor;
+    }
+    return ids;
+  }
+
+  async function fetchOpenOrders() {
+    const limit = Number(localStorage.getItem("packscan_order_limit")) || 100;
+    const pageSize = 25;
+    const openPages = Math.max(1, Math.ceil((limit * 2) / 3 / pageSize));
+    const donePages = Math.max(1, Math.ceil((limit * 1) / 3 / pageSize));
+    const openIds = await collectOrderIds(
+      "fulfillment_status:unfulfilled OR fulfillment_status:partial",
+      openPages
+    );
+    const doneIds = await collectOrderIds("fulfillment_status:fulfilled", donePages);
+    const ids = [...new Set([...openIds, ...doneIds])];
+    return fetchDetails(ids);
+  }
+
+  function adminOrderUrl(orderGid) {
+    const shop = String(window.PACKSCAN_SHOP || "").replace(/\.myshopify\.com$/i, "");
+    const num = String(orderGid || "").split("/").pop();
+    if (!shop || !num) return null;
+    return `https://admin.shopify.com/store/${shop}/orders/${num}`;
+  }
+
+  async function fulfillItems(fulfillmentOrderId, items, notifyCustomer, tracking) {
+    const lineItems = items
+      .filter((i) => i.picked > 0)
+      .map((i) => ({ id: i.id, quantity: i.picked }));
+    if (!lineItems.length) throw new Error("Nothing to fulfill");
+    const fulfillment = {
+      notifyCustomer: Boolean(notifyCustomer),
+      lineItemsByFulfillmentOrder: [
+        {
+          fulfillmentOrderId,
+          fulfillmentOrderLineItems: lineItems,
+        },
+      ],
+    };
+    if (tracking && tracking.number) {
+      fulfillment.trackingInfo = {
+        company: tracking.company || "FedEx",
+        number: String(tracking.number).trim(),
+      };
+    }
+    const data = await request(FULFILL_MUTATION, { fulfillment });
+    const payload = data.fulfillmentCreate;
+    if (payload.userErrors?.length) {
+      throw new Error(payload.userErrors.map((e) => e.message).join("; "));
+    }
+    return payload.fulfillment;
+  }
+
+  async function cancelFulfillments(order) {
+    const list = (order.fulfillments || []).filter((f) => f && f.id && String(f.status || "").toUpperCase() !== "CANCELLED");
+    if (!list.length) return 0;
+    let n = 0;
+    const errors = [];
+    for (const f of list) {
+      try {
+        const data = await request(CANCEL_FULFILLMENT, { id: f.id });
+        const payload = data.fulfillmentCancel;
+        if (payload.userErrors?.length) {
+          errors.push(payload.userErrors.map((e) => e.message).join("; "));
+        } else {
+          n += 1;
+        }
+      } catch (err) {
+        errors.push(err.message || String(err));
+      }
+    }
+    if (!n && errors.length) throw new Error(errors.join("; "));
+    if (errors.length) toast(errors.join("; "), "bad");
+    return n;
+  }
+
+  async function buyShopifyLabel(order, carton) {
+    const fo = (order.fulfillmentOrders || []).find((f) => (f.lineItems || []).some((li) => (li.remaining || 0) > 0))
+      || (order.fulfillmentOrders || [])[0];
+    if (!fo?.id) throw new Error("No fulfillment order on this ticket");
+    const w = Math.max(0.1, Number(carton.weight) || 0.1);
+    const l = Math.max(1, Number(carton.l) || 10);
+    const wd = Math.max(1, Number(carton.w) || 8);
+    const h = Math.max(1, Number(carton.h) || 4);
+    const when = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const BUY = `
+      mutation PackScanShopifyLabel($input: ShippingLabelPurchaseInput!) {
+        shippingLabelPurchase(shippingLabelPurchase: $input) {
+          shippingLabelPurchaseResult {
+            id
+            status
+            shippingLabels {
+              id
+              trackingInfo { number company url }
+              shippingDocuments { url fileType }
+            }
+            errors { message }
+          }
+          userErrors { field message }
+        }
+      }
+    `;
+    const input = {
+      fulfillmentOrderId: fo.id,
+      shippingDatetime: when,
+      notifyCustomer: settings().notify,
+      totalWeight: { value: w, unit: "POUNDS" },
+      packageInfo: {
+        customPackage: {
+          type: "BOX",
+          dimensions: { length: l, width: wd, height: h, unit: "INCHES" },
+          weight: { value: 0.2, unit: "POUNDS" },
+        },
+      },
+    };
+    const data = await request(BUY, { input });
+    const payload = data.shippingLabelPurchase || {};
+    if (payload.userErrors?.length) throw new Error(payload.userErrors.map((e) => e.message).join("; "));
+    let result = payload.shippingLabelPurchaseResult || payload;
+    for (let i = 0; i < 8 && result && String(result.status || "").includes("PENDING"); i++) {
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        const q = `query($id: ID!) { shippingLabelPurchaseResult(id: $id) { id status shippingLabels { id trackingInfo { number company } shippingDocuments { url fileType } } errors { message } } }`;
+        const again = await request(q, { id: result.id });
+        if (again.shippingLabelPurchaseResult) result = again.shippingLabelPurchaseResult;
+      } catch (_) {
+        break;
+      }
+    }
+    if (result?.errors?.length) throw new Error(result.errors.map((e) => e.message || e).join("; "));
+    const label = (result.shippingLabels || [])[0] || {};
+    const doc = (label.shippingDocuments || [])[0] || {};
+    return {
+      trackingNumber: label.trackingInfo?.number || "",
+      company: label.trackingInfo?.company || "Shopify Shipping",
+      labelUrl: doc.url || "",
+      status: result.status || "",
+    };
+  }
+
+  return { settings, configured, testConnection, fetchOpenOrders, fulfillItems, cancelFulfillments, adminOrderUrl, buyShopifyLabel };
+})();
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const SHOPIFY_SENSITIVE_STORAGE_KEYS = [
+  "packscan_shop",
+  "packscan_client_id",
+  "packscan_client_secret",
+  "packscan_token",
+];
+
+function disableAutofill(root = document) {
+  root.querySelectorAll("input, select, textarea").forEach((field) => {
+    field.setAttribute("autocomplete", "off");
+  });
+}
+
+const state = {
+  mode: localStorage.getItem("packscan_mode") || "demo",
+  orders: [],
+  filter: "open",
+  search: "",
+  currentId: null,
+  pick: {}, // orderId -> { [lineItemId]: pickedCount }
+  carton: {},
+  scanner: null,
+  sound: localStorage.getItem("packscan_sound") !== "0",
+  packMode: localStorage.getItem("packscan_pack_mode") || "EA",
+  autoFill: { enabled: false, orderId: null, cartonQty: 0, box: "", busy: false },
+};
+
+function shipmentWeightLb(order) {
+  let pickedW = 0;
+  let remW = 0;
+  let any = false;
+  for (const fo of order.fulfillmentOrders || []) {
+    for (const li of fo.lineItems || []) {
+      if (!li.weightLb) continue;
+      any = true;
+      pickedW += pickCount(order.id, li.id) * li.weightLb;
+      remW += (li.remaining || 0) * li.weightLb;
+    }
+  }
+  if (!any) return null;
+  const w = pickedW > 0 ? pickedW : remW;
+  return Math.max(0.1, Math.round(w * 100) / 100);
+}
+
+function cartonOf(orderId) {
+  if (!state.carton[orderId]) {
+    state.carton[orderId] = { weight: "", l: "", w: "", h: "", carrier: "fedex", service: "FEDEX_GROUND", tracking: "", boxWeight: 0 };
+  }
+  return state.carton[orderId];
+}
+
+function toast(msg, kind = "ok") {
+  const el = $("#toast");
+  el.textContent = msg;
+  el.className = `toast show ${kind}`;
+  setTimeout(() => el.classList.remove("show"), kind === "bad" ? 8000 : 2200);
+}
+
+function beep(ok = true) {
+  if (!state.sound) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.type = "sine";
+    o.frequency.value = ok ? 880 : 220;
+    g.gain.value = 0.08;
+    o.start();
+    o.stop(ctx.currentTime + (ok ? 0.09 : 0.22));
+  } catch (_) {}
+}
+
+function customerName(order) {
+  const a = order.shippingAddress || {};
+  const fromAddr = `${a.firstName || ""} ${a.lastName || ""}`.trim() || (a.name || "").trim();
+  if (fromAddr) return fromAddr;
+  return order.email || "Guest";
+}
+
+function remainingOf(order) {
+  return order.fulfillmentOrders.flatMap((fo) => fo.lineItems).reduce((n, li) => n + ((isNoPickLine(li) ? 0 : li.remaining) || 0), 0);
+}
+
+function isNoPickLine(li) {
+  if (!li) return false;
+  const t = `${li.title || ""} ${li.productType || ""}`.toLowerCase();
+  if (/faire\s*(commission|payment|processing|fee)|payment processing fee|\bcommission\b|\bprocessing fee\b/.test(t)) return true;
+  if (li.requiresShipping === false && !String(li.sku || "").trim() && !String(li.barcode || "").trim()) return true;
+  if (li.tracked === false && li.requiresShipping === false && !String(li.sku || "").trim()) return true;
+  return false;
+}
+
+function pickedOf(order) {
+  const map = state.pick[order.id] || {};
+  return Object.values(map).reduce((n, v) => n + v, 0);
+}
+
+function pickCount(orderId, lineId) {
+  return (state.pick[orderId] || {})[lineId] || 0;
+}
+
+function setPick(orderId, lineId, value, max) {
+  if (!state.pick[orderId]) state.pick[orderId] = {};
+  state.pick[orderId][lineId] = Math.max(0, Math.min(max, value));
+}
+
+function packDefaults() {
+  const fallback = { EA: 1, C1: 6, C2: 12, C3: 72 };
+  try {
+    const raw = JSON.parse(localStorage.getItem("packscan_pack_defaults") || "{}");
+    return {
+      EA: Math.max(1, parseInt(raw.EA, 10) || fallback.EA),
+      C1: Math.max(1, parseInt(raw.C1, 10) || fallback.C1),
+      C2: Math.max(1, parseInt(raw.C2, 10) || fallback.C2),
+      C3: Math.max(1, parseInt(raw.C3, 10) || fallback.C3),
+    };
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function useShopifyShipping() {
+  return localStorage.getItem("packscan_shopify_shipping") === "1";
+}
+
+function applyShopifyShippingUi() {
+  const on = $("#shopifyShipInput") ? $("#shopifyShipInput").checked : useShopifyShipping();
+  const block = $("#carrierApiBlock");
+  if (!block) return;
+  block.classList.toggle("is-disabled", on);
+  block.querySelectorAll("input, select, textarea").forEach((el) => {
+    el.disabled = on;
+  });
+}
+
+function currentPackQty() {
+  const d = packDefaults();
+  return d[state.packMode] || d.EA || 1;
+}
+
+function savePackDefaultsFromForm() {
+  const d = {
+    EA: Math.max(1, parseInt($("#packEaInput")?.value, 10) || 1),
+    C1: Math.max(1, parseInt($("#packC1Input")?.value, 10) || 6),
+    C2: Math.max(1, parseInt($("#packC2Input")?.value, 10) || 12),
+    C3: Math.max(1, parseInt($("#packC3Input")?.value, 10) || 72),
+  };
+  localStorage.setItem("packscan_pack_defaults", JSON.stringify(d));
+  return d;
+}
+
+function fillPackDefaultFields() {
+  const d = packDefaults();
+  if ($("#packEaInput")) $("#packEaInput").value = d.EA;
+  if ($("#packC1Input")) $("#packC1Input").value = d.C1;
+  if ($("#packC2Input")) $("#packC2Input").value = d.C2;
+  if ($("#packC3Input")) $("#packC3Input").value = d.C3;
+}
+
+function renderPackToggle() {
+  const d = packDefaults();
+  $$("#packToggle .pack-btn").forEach((btn) => {
+    const key = btn.dataset.pack;
+    btn.classList.toggle("active", key === state.packMode);
+    btn.textContent = key + " · " + (d[key] || 1);
+  });
+}
+
+function savedBoxes() {
+  try {
+    const raw = JSON.parse(localStorage.getItem("packscan_boxes") || "[]");
+    if (!Array.isArray(raw)) return [];
+    return raw.slice(0, 10).map((b, i) => ({
+      name: String(b.name || "").trim() || ("Box " + (i + 1)),
+      l: String(b.l || ""),
+      w: String(b.w || ""),
+      h: String(b.h || ""),
+      weight: String(b.weight || ""),
+    })).filter((b) => b.l || b.w || b.h || b.weight || (b.name && !/^Box \d+$/.test(b.name)));
+  } catch (_) {
+    return [];
+  }
+}
+
+function fillBoxDefaultFields() {
+  const list = $("#boxDefaultsList");
+  if (!list) return;
+  const boxes = savedBoxes();
+  const rows = [];
+  for (let i = 0; i < 10; i++) {
+    const b = boxes[i] || { name: "", l: "", w: "", h: "", weight: "" };
+    rows.push(`<div class="box-default-row">
+      <input class="box-name" data-i="${i}" placeholder="Name (Box ${i + 1})" value="${String(b.name || "").replace(/"/g, "&quot;")}" autocomplete="off">
+      <input class="box-l" data-i="${i}" type="number" min="0" step="0.1" placeholder="L" value="${b.l || ""}" autocomplete="off">
+      <input class="box-w" data-i="${i}" type="number" min="0" step="0.1" placeholder="W" value="${b.w || ""}" autocomplete="off">
+      <input class="box-h" data-i="${i}" type="number" min="0" step="0.1" placeholder="H" value="${b.h || ""}" autocomplete="off">
+      <input class="box-weight" data-i="${i}" type="number" min="0" step="0.01" placeholder="Empty wt (lb)" value="${b.weight || ""}" autocomplete="off">
+    </div>`);
+  }
+  list.innerHTML = rows.join("");
+}
+
+function saveBoxesFromForm() {
+  const names = $$("#boxDefaultsList .box-name");
+  const boxes = names.map((nameEl, i) => {
+    const l = $(`#boxDefaultsList .box-l[data-i="${i}"]`)?.value || "";
+    const w = $(`#boxDefaultsList .box-w[data-i="${i}"]`)?.value || "";
+    const h = $(`#boxDefaultsList .box-h[data-i="${i}"]`)?.value || "";
+    const weight = $(`#boxDefaultsList .box-weight[data-i="${i}"]`)?.value || "";
+    const name = (nameEl.value || "").trim();
+    return { name, l, w, h, weight };
+  }).filter((b) => b.name || b.l || b.w || b.h || b.weight);
+  localStorage.setItem("packscan_boxes", JSON.stringify(boxes.slice(0, 10)));
+  return boxes;
+}
+
+function boxOptionsHtml(selected) {
+  const boxes = savedBoxes();
+  const opts = [`<option value="">Custom</option>`];
+  boxes.forEach((b, i) => {
+    const label = `${b.name || "Box " + (i + 1)} (${b.l || "?"}×${b.w || "?"}×${b.h || "?"}${b.weight ? ", " + b.weight + " lb empty" : ""})`;
+    const sel = selected === String(i) || selected === b.name ? "selected" : "";
+    opts.push(`<option value="${i}" ${sel}>${label}</option>`);
+  });
+  return opts.join("");
+}
+
+function applySavedBox(index) {
+  const boxes = savedBoxes();
+  const b = boxes[Number(index)];
+  if (!b) return;
+  const order = currentOrder();
+  if (order) {
+    const c = cartonOf(order.id);
+    c.l = b.l;
+    c.w = b.w;
+    c.h = b.h;
+    c.box = String(index);
+    const boxWeight = Number(b.weight) || 0;
+    if (boxWeight > 0) {
+      const currentWeight = Number($("#cartonWeight")?.value ?? c.weight) || 0;
+      const prevBoxWeight = Number(c.boxWeight) || 0;
+      const itemWeight = Math.max(0, currentWeight - prevBoxWeight);
+      c.boxWeight = boxWeight;
+      c.weight = String(Math.round((itemWeight + boxWeight) * 100) / 100);
+    } else {
+      c.boxWeight = 0;
+    }
+  }
+  if ($("#cartonL")) $("#cartonL").value = b.l;
+  if ($("#cartonW")) $("#cartonW").value = b.w;
+  if ($("#cartonH")) $("#cartonH").value = b.h;
+  if ($("#cartonWeight") && order) $("#cartonWeight").value = cartonOf(order.id).weight;
+}
+
+function applyAutoFillBox(orderId) {
+  const index = state.autoFill.box;
+  const box = savedBoxes()[Number(index)];
+  if (!box) return;
+  const carton = cartonOf(orderId);
+  carton.l = box.l;
+  carton.w = box.w;
+  carton.h = box.h;
+  carton.box = String(index);
+  carton.boxWeight = Number(box.weight) || 0;
+}
+
+function currentOrder() {
+  return state.orders.find((o) => o.id === state.currentId) || null;
+}
+
+const CHANNEL_PRESETS = ["Faire", "Online Store", "Shop", "Point of Sale", "Instagram", "Facebook", "Google", "Amazon", "Shopify", "PackScan-Order"];
+
+function enabledChannels() {
+  try {
+    const raw = localStorage.getItem("packscan_channels");
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return {};
+}
+
+function channelAllowed(name) {
+  const map = enabledChannels();
+  if (!name) return true;
+  if (!(name in map)) return true;
+  return map[name] !== false;
+}
+
+function rememberChannels(orders) {
+  const map = enabledChannels();
+  let changed = false;
+  for (const o of orders || []) {
+    const n = o.channel || "Shopify";
+    if (!(n in map)) {
+      map[n] = true;
+      changed = true;
+    }
+  }
+  if (changed) localStorage.setItem("packscan_channels", JSON.stringify(map));
+}
+
+function persistEnabledChannels() {
+  const map = enabledChannels();
+  $$(".ch-toggle").forEach((el) => {
+    map[el.dataset.channel] = el.checked;
+  });
+  localStorage.setItem("packscan_channels", JSON.stringify(map));
+}
+
+function channelCheckboxList() {
+  const map = enabledChannels();
+  const names = [...new Set([...CHANNEL_PRESETS, ...Object.keys(map)])].sort((a, b) => a.localeCompare(b));
+  return names.map((n) => {
+    const on = map[n] !== false;
+    return `<label><input type="checkbox" class="ch-toggle" data-channel="${n}" autocomplete="off" ${on ? "checked" : ""} /> ${n}</label>`;
+  }).join("");
+}
+
+function loadChannelToggles() {
+  const box = $("#channelGrid");
+  if (box) box.innerHTML = channelCheckboxList();
+}
+
+function filteredOrders() {
+  const q = state.search.trim().toLowerCase();
+  return state.orders.filter((o) => {
+    if (!channelAllowed(o.channel || "Shopify")) return false;
+    const rem = remainingOf(o);
+    if (state.filter === "open" && rem === 0) return false;
+    if (state.filter === "done" && rem > 0) return false;
+    if (!q) return true;
+    const hay = [
+      o.name,
+      customerName(o),
+      o.email,
+      o.note,
+      ...(o.fulfillmentOrders || []).flatMap((fo) => fo.lineItems.map((li) => `${li.title} ${li.sku} ${li.barcode}`)),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+function normalizeOrderQuery(q) {
+  return String(q || "").trim().toLowerCase().replace(/^#/, "");
+}
+
+function findOrderByCode(raw) {
+  const nq = normalizeOrderQuery(raw);
+  if (!nq) return null;
+  const exact = state.orders.find((o) => normalizeOrderQuery(o.name) === nq);
+  if (exact) return exact;
+  const hits = state.orders.filter((o) => {
+    const name = normalizeOrderQuery(o.name);
+    return name.includes(nq) || nq.includes(name);
+  });
+  if (hits.length === 1) return hits[0];
+  return null;
+}
+
+function selectOrderFromSearch(force) {
+  const q = state.search.trim();
+  if (!q) return false;
+  const rows = filteredOrders();
+  const nq = normalizeOrderQuery(q);
+  const exact = findOrderByCode(q);
+  const pick = exact || (force && rows.length === 1 ? rows[0] : null);
+  if (!pick && force && rows.length) {
+    state.currentId = rows[0].id;
+    renderAll();
+    if (force) $("#scanInput")?.focus();
+    return true;
+  }
+  if (!pick) return false;
+  if (state.currentId === pick.id) {
+    if (force) {
+      $("#search").value = pick.name || q;
+      state.search = $("#search").value;
+      $("#scanInput")?.focus();
+    }
+    return true;
+  }
+  if (!force && !exact) return false;
+  state.currentId = pick.id;
+  if (force) {
+    $("#search").value = pick.name || q;
+    state.search = $("#search").value;
+  }
+  renderAll();
+  if (force || document.activeElement !== $("#search")) $("#scanInput")?.focus();
+  return true;
+}
+
+function renderList() {
+  const list = $("#orderList");
+  const rows = filteredOrders();
+  $("#orderCount").textContent = `${rows.length}`;
+  if (!rows.length) {
+    list.innerHTML = `<p class="meta" style="padding:12px">No orders match.</p>`;
+    return;
+  }
+  list.innerHTML = rows
+    .map((o) => {
+      const rem = remainingOf(o);
+      const picked = pickedOf(o);
+      const st = rem === 0 ? "fulfilled" : picked > 0 ? "partial" : (o.displayFulfillmentStatus || "unfulfilled").toLowerCase();
+      return `
+        <button class="order-card ${o.id === state.currentId ? "active" : ""}" data-id="${o.id}">
+          <div class="row">
+            <span class="order-name">${o.name}</span>
+            <span class="status ${st}">${st}</span>
+          </div>
+          <div class="row">
+            <span class="meta">${customerName(o)}${(o.shippingAddress?.company) ? " · " + o.shippingAddress.company : ""}${o.channel ? " · " + o.channel : ""}</span>
+            <span class="meta">${picked}/${rem} picked</span>
+          </div>
+        </button>`;
+    })
+    .join("");
+}
+
+function renderPackingSlipPreview(order) {
+  if (!order) return "";
+  let lines = scannedLines(order);
+  const isScanned = lines.length > 0;
+  if (!lines.length) {
+    lines = order.fulfillmentOrders.flatMap((fo) => fo.lineItems)
+      .filter((li) => !isNoPickLine(li) && ((li.remaining || 0) > 0 || (li.qty || 0) > 0))
+      .map((li) => ({ ...li, scanned: (li.remaining != null ? li.remaining : li.qty) }));
+  }
+  const totalUnits = lines.reduce((sum, li) => sum + Number(li.scanned || 0), 0);
+  const rows = lines.map((li) => `
+    <tr>
+      <td class="slip-sku-col">${li.sku || "—"}</td>
+      <td class="slip-item-col">${li.title}</td>
+      <td class="slip-qty-col">${li.scanned}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <aside class="packing-slip-visual no-print" aria-label="Packing list preview">
+      <div class="packing-slip-paper">
+        <table class="packing-slip-table">
+          <thead>
+            <tr>
+              <th class="slip-sku-col">SKU</th>
+              <th class="slip-item-col">Description</th>
+              <th class="slip-qty-col">Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows || `<tr><td colspan="3" style="text-align:center;padding:10px;color:#888;">No items</td></tr>`}
+          </tbody>
+        </table>
+        <div class="packing-slip-summary">
+          <span>${totalUnits} units${isScanned ? " scanned" : ""}</span>
+        </div>
+        <div class="packing-slip-footer">PackScan for Shopify — PackScan.Shop</div>
+      </div>
+    </aside>
+  `;
+}
+
+function renderDetail() {
+  const order = currentOrder();
+  const root = $("#detail");
+  if (!order) {
+    root.innerHTML = `
+      <div class="empty">
+        <h2>Select an order</h2>
+        <p>Scan a product barcode or pick an order on the left. Correct scans increment picked qty. When a line is complete it turns green.</p>
+      </div>`;
+    return;
+  }
+
+  const feeLines = order.fulfillmentOrders.flatMap((fo) => fo.lineItems).filter(isNoPickLine);
+  const items = order.fulfillmentOrders.flatMap((fo) =>
+    fo.lineItems.filter((li) => !isNoPickLine(li)).map((li) => ({ ...li, foId: fo.id, locationName: fo.locationName }))
+  );
+  const rem = remainingOf(order);
+  const picked = pickedOf(order);
+  const total = rem;
+  const pct = total ? Math.min(100, Math.round((picked / total) * 100)) : 0;
+  const addr = order.shippingAddress;
+  const autoFillActive = state.autoFill.enabled && state.autoFill.orderId === order.id;
+  const addrLine = addr ? [addr.address1, addr.city, addr.provinceCode, addr.zip].filter(Boolean).join(", ") : "No address";
+  const autoLb = shipmentWeightLb(order);
+  if (autoLb != null) {
+    const c = cartonOf(order.id);
+    const boxWeight = Number(c.boxWeight) || 0;
+    c.weight = String(Math.round((autoLb + boxWeight) * 100) / 100);
+  }
+  const showPackingList = localStorage.getItem("packscan_view_packing_list") !== "0";
+
+  root.innerHTML = `
+    <div class="order-head">
+      <div>
+        <h2 style="margin:0 0 4px">${order.name} · ${customerName(order)}${addr?.company ? " · " + addr.company : ""}</h2>
+        <div class="meta">${addrLine}${order.note ? " · " + order.note : ""}${feeLines.length ? " · " + feeLines.length + " fee line(s) auto-fulfilled" : ""}</div>
+      </div>
+      <div class="no-print actions" style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="ghost-btn mobile-only" id="mobileBack">Orders</button>
+        <button class="ghost-btn" id="printSlip">Print Slip</button>
+        <button class="ok-btn" id="fulfillAllBtn">Fulfill All</button>
+        <button class="${autoFillActive ? "primary-btn" : "ghost-btn"}" id="autoFillBtn">${autoFillActive ? (state.autoFill.busy ? "Auto-fill: Processing…" : `Auto-fill: On (${picked}/${state.autoFill.cartonQty})`) : "Auto-fill: Off"}</button>
+        <button class="ghost-btn" id="clearOrderBtn">Clear Order</button>
+        <button class="ghost-btn" id="unfillBtn">Unfill</button>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress"><span style="width:${pct}%"></span></div>
+        <div class="meta" style="margin-top:6px">${picked} of ${total} remaining units picked</div>
+      </div>
+    </div>
+    ${renderCarton(order, picked)}
+    <div class="order-content-layout ${showPackingList ? "has-slip" : ""}">
+      <div class="items">
+        ${items
+          .map((li) => {
+            const p = pickCount(order.id, li.id);
+            const done = p >= li.remaining && li.remaining >= 0 && p > 0 && p === li.remaining || (li.remaining === 0 && p === 0 && li.qty > 0 && false);
+            const complete = p >= li.remaining;
+            const already = li.remaining === 0;
+            return `
+              <article class="item ${complete || already ? "done" : ""}" data-line="${li.id}" data-fo="${li.foId}">
+                <div class="item-heading">
+                  <div class="sku">${li.sku || "no SKU"}</div>
+                  <h3>${li.title}</h3>
+                </div>
+                ${li.image ? `<img class="thumb" src="${li.image}" alt="">` : `<div class="thumb ph">SKU</div>`}
+                <div class="item-details">
+                  <div class="barcode-number">${li.barcode || "no barcode"}</div>
+                  <div class="meta">${li.locationName || ""} · need ${li.remaining} of ${li.qty}${li.onHand != null ? " · on hand " + li.onHand : ""}${li.weightLb ? " · " + Number(li.weightLb).toFixed(2) + " lb ea" : ""}</div>
+                  ${localStorage.getItem("packscan_view_barcode") !== "0"
+                    ? `<div class="barcode-preview"><svg class="bc" data-bc="${(li.barcode || li.sku || "").replace(/"/g, "")}"></svg></div>`
+                    : ""}
+                </div>
+                <div class="qty">
+                  <div class="n ${complete ? "done" : ""}">${p}<span class="meta"> / ${li.remaining}</span></div>
+                  <div class="qty-actions no-print">
+                    <button class="ghost-btn dec" data-line="${li.id}" ${p <= 0 ? "disabled" : ""}>−</button>
+                    <button class="ghost-btn inc" data-line="${li.id}" ${p >= li.remaining ? "disabled" : ""}>+</button>
+                  </div>
+                </div>
+              </article>`;
+          })
+          .join("")}
+      </div>
+      ${showPackingList ? renderPackingSlipPreview(order) : ""}
+    </div>
+  `;
+
+  if (window.JsBarcode) {
+    $$("svg.bc", root).forEach((el) => {
+      const val = (el.dataset.bc || "").trim();
+      if (!val) return;
+      try {
+        const digits = /^\d{12,13}$/.test(val);
+        JsBarcode(el, val, {
+          format: digits ? (val.length === 13 ? "EAN13" : "UPC") : "CODE128",
+          displayValue: true,
+          fontSize: 10,
+          margin: 4,
+          height: 40,
+          width: 1.4,
+          background: "#ffffff",
+          lineColor: "#000000",
+        });
+      } catch (_) {
+        try {
+          JsBarcode(el, val, { format: "CODE128", displayValue: true, fontSize: 10, margin: 4, height: 40, width: 1.4, background: "#ffffff", lineColor: "#000000" });
+        } catch (__) {}
+      }
+    });
+  }
+}
+
+function renderCarton(order, picked) {
+  const c = cartonOf(order.id);
+  const autoFillActive = state.autoFill.enabled && state.autoFill.orderId === order.id;
+  const selectedCarrier = useShopifyShipping() ? "shopify" : c.carrier;
+  const availableServices = servicesForCarrier(selectedCarrier);
+  const selectedService = availableServices.includes(c.service) ? c.service : availableServices[0];
+  c.service = selectedService;
+  const adminUrl = window.ShopifyAPI ? ShopifyAPI.adminOrderUrl(order.id) : null;
+  return `
+    <section class="carton no-print">
+      <h3>Close carton</h3>
+      <p class="meta">${useShopifyShipping()
+        ? "Shopify Shipping is on. Print label buys a discounted Shopify Shipping label (Admin → Shipping labels). Shopify picks the cheapest available USPS / UPS / DHL rate. FedEx labels are not sold through the app API."
+        : "Weigh the box, get rates, print a label. Production keys charge that carrier."}</p>
+      <div class="carton-grid">
+        <label>Carrier
+          <select id="cartonCarrier" autocomplete="off">
+            ${useShopifyShipping() ? `<option value="shopify" selected>Shopify Shipping</option>` : ""}
+            <option value="fedex" ${!useShopifyShipping() && (c.carrier === "fedex" || !c.carrier) ? "selected" : ""}>FedEx</option>
+            <option value="ups" ${c.carrier === "ups" ? "selected" : ""}>UPS</option>
+            <option value="usps" ${c.carrier === "usps" || c.carrier === "stamps" ? "selected" : ""}>Stamps.com (USPS)</option>
+            <option value="ltl" ${c.carrier === "ltl" ? "selected" : ""}>LTL</option>
+            <option value="other" ${c.carrier === "other" ? "selected" : ""}>Other</option>
+          </select>
+        </label>
+        <label>Weight (lb)<input id="cartonWeight" type="number" min="0" step="0.1" value="${c.weight}" autocomplete="off"></label>
+        <label>Box
+          <select id="cartonBox" autocomplete="off">${boxOptionsHtml(c.box)}</select>
+        </label>
+        <label>L (in)<input id="cartonL" type="number" min="0" step="0.1" value="${c.l}" autocomplete="off"></label>
+        <label>W (in)<input id="cartonW" type="number" min="0" step="0.1" value="${c.w}" autocomplete="off"></label>
+        <label>H (in)<input id="cartonH" type="number" min="0" step="0.1" value="${c.h}" autocomplete="off"></label>
+        <label>Service
+          <select id="cartonService" autocomplete="off">
+            ${serviceOptionsHtml(selectedCarrier, selectedService)}
+          </select>
+        </label>
+        <label>Tracking # (after label prints)<input id="cartonTracking" placeholder="7946…" value="${c.tracking || ""}" autocomplete="off"></label>
+      </div>
+      <div id="rateBox" class="rate-box">${renderRateBox(c.rates)}</div>
+      <div class="actions" style="justify-content:flex-start;margin-top:12px">
+        <button class="ghost-btn" id="rateBtn">Get Rates</button>
+        <button class="primary-btn" id="printFedexBtn" ${autoFillActive ? "disabled" : ""}>Print Label (F10)</button>
+        <button class="ok-btn" id="fulfillBtn" ${picked === 0 || autoFillActive ? "disabled" : ""}>Close Carton (F8)</button>
+        ${adminUrl ? `<a class="ghost-btn" href="${adminUrl}" target="_blank" rel="noopener">Open order in Shopify</a>` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function rateAllowed(r) {
+  const raw = String(r.serviceType || r.serviceName || "");
+  if (/SHOPIFY/i.test(raw)) return true;
+  const mapped = mapRateToSelect(raw);
+  return enabledServices()[mapped] !== false;
+}
+
+function renderRateBox(rates) {
+  if (!rates) return `<p class="meta">Click Get rates for live prices to this address.</p>`;
+  const shown = rates.filter(rateAllowed);
+  if (!shown.length) return `<p class="meta">No rates for your enabled services.</p>`;
+  return `<div class="rate-list">${shown.map((r) => {
+    const amt = Number(r.amount).toFixed(2);
+    return `<button type="button" class="rate-row" data-service="${r.serviceType}">
+      <span>${r.serviceName}</span>
+      <span class="meta">${r.transit || ""}</span>
+      <b>$${amt}</b>
+    </button>`;
+  }).join("")}</div>`;
+}
+
+function demoRates(carrier, weight) {
+  const multiplier = Math.max(1, Number(weight) || 1) / 2;
+  const services = {
+    fedex: [
+      ["FEDEX_GROUND", "FedEx Ground", "3–5 business days", 12.95],
+      ["FEDEX_HOME_DELIVERY", "FedEx Home Delivery", "2–5 business days", 15.45],
+      ["FEDEX_2_DAY", "FedEx 2Day", "2 business days", 24.8],
+      ["FEDEX_2_DAY_AM", "FedEx 2Day AM", "2 business days by morning", 29.8],
+      ["STANDARD_OVERNIGHT", "FedEx Standard Overnight", "Next business afternoon", 34.8],
+      ["PRIORITY_OVERNIGHT", "FedEx Priority Overnight", "Next business morning", 42.8],
+      ["FIRST_OVERNIGHT", "FedEx First Overnight", "Next business early morning", 58.8],
+    ],
+    ups: [
+      ["03", "UPS Ground", "3–5 business days", 13.25],
+      ["12", "UPS 3 Day Select", "3 business days", 19.9],
+      ["02", "UPS 2nd Day Air", "2 business days", 27.4],
+    ],
+    usps: [
+      ["USPS_GA", "USPS Ground Advantage", "2–5 business days", 8.95],
+      ["USPS_PRIORITY", "USPS Priority Mail", "1–3 business days", 14.6],
+      ["USPS_EXPRESS", "USPS Priority Mail Express", "1–2 business days", 31.75],
+    ],
+  };
+  return (services[carrier] || services.fedex).map(([serviceType, serviceName, transit, base]) => ({
+    serviceType,
+    serviceName: `${serviceName} · sample`,
+    transit,
+    amount: Math.round(base * multiplier * 100) / 100,
+    currency: "USD",
+  }));
+}
+
+function readCartonForm(orderId) {
+  const c = cartonOf(orderId);
+  c.weight = $("#cartonWeight")?.value || "";
+  c.l = $("#cartonL")?.value || "";
+  c.w = $("#cartonW")?.value || "";
+  c.h = $("#cartonH")?.value || "";
+  c.box = $("#cartonBox")?.value || "";
+  c.carrier = $("#cartonCarrier")?.value || c.carrier || "fedex";
+  c.service = $("#cartonService")?.value || "FEDEX_GROUND";
+  c.tracking = $("#cartonTracking")?.value || "";
+  return c;
+}
+
+function renderAll() {
+  const layout = document.querySelector(".layout");
+  if (layout) layout.classList.toggle("order-open", !!state.currentId);
+  if (state.currentId && $("#cartonWeight")) readCartonForm(state.currentId);
+  if (state.autoFill.enabled && state.autoFill.orderId === state.currentId && state.autoFill.box !== "") {
+    applyAutoFillBox(state.currentId);
+  }
+  const live = state.mode === "live";
+  $("#modePill").textContent = live ? "Shopify live" : "Demo mode";
+  $("#modePill").classList.toggle("live", live);
+  renderPackToggle();
+  renderList();
+  renderDetail();
+  disableAutofill();
+}
+
+function focusOrderSearch() {
+  const el = $("#search");
+  if (!el) return;
+  el.focus();
+  el.select();
+}
+
+function setScanStatus(message, kind = "") {
+  const el = $("#scanStatus");
+  if (!el) return;
+  el.textContent = message;
+  el.className = `scan-status${kind ? ` ${kind}` : ""}`;
+}
+
+function normalizeItemCode(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
+function itemCodeCandidates(li) {
+  return [...new Set([li?.barcode, li?.sku, ...(li?.codes || [])]
+    .map(normalizeItemCode)
+    .filter(Boolean))];
+}
+
+function codesMatch(candidate, needle) {
+  if (candidate === needle) return true;
+  return candidate.replace(/^0+/, "") === needle.replace(/^0+/, "");
+}
+
+function findMatchingLine(order, raw) {
+  const needle = normalizeItemCode(raw);
+  if (!needle || !order) return null;
+  return order.fulfillmentOrders.flatMap((fo) => fo.lineItems).find((li) => {
+    if (li.id === raw) return true;
+    return itemCodeCandidates(li).some((code) => codesMatch(code, needle));
+  }) || null;
+}
+
+function afterOrderDone() {
+  if (state.autoFill.orderId === state.currentId) {
+    state.autoFill.enabled = false;
+    state.autoFill.orderId = null;
+    state.autoFill.busy = false;
+  }
+  state.currentId = null;
+  renderAll();
+  focusOrderSearch();
+}
+
+function showWarn(title, text) {
+  const h = $("#warnModalTitle");
+  const msg = $("#warnModalText");
+  if (h) h.textContent = title;
+  if (msg) msg.textContent = text;
+  $("#warnModal")?.classList.add("open");
+  setTimeout(() => $("#warnOk")?.focus(), 0);
+}
+
+function showNotOnOrder(raw) {
+  showWarn("Not on this order", "Not on this order — " + raw);
+}
+
+function hideNotOnOrder() {
+  if (!$("#warnModal")?.classList.contains("open")) return;
+  $("#warnModal").classList.remove("open");
+  if (state.currentId) $("#scanInput")?.focus();
+  else focusOrderSearch();
+}
+
+async function applyScan(code) {
+  const raw = String(code || "").trim();
+  if (!raw) return;
+  $("#scanInput").value = "";
+  if (state.autoFill.busy) {
+    beep(false);
+    toast("Auto-fill is printing and closing the current carton", "bad");
+    setScanStatus("Scan rejected: Auto-fill is closing the carton", "bad");
+    return;
+  }
+
+  let order = currentOrder();
+
+  if (!order) {
+    const found = state.orders.find((o) => remainingOf(o) > 0 && findMatchingLine(o, raw));
+    if (found) {
+      state.currentId = found.id;
+      order = found;
+    }
+  }
+  const byName = findOrderByCode(raw);
+  if (byName) {
+    state.currentId = byName.id;
+    $("#search").value = byName.name;
+    state.search = byName.name;
+    beep(true);
+    renderAll();
+    setScanStatus(`Selected order ${byName.name} - ready for item scan`, "ok");
+    $("#scanInput")?.focus();
+    return;
+  }
+  if (order) {
+    const oname = normalizeOrderQuery(order.name);
+    const frag = normalizeOrderQuery(raw);
+    if (frag && oname.endsWith(frag)) {
+      $("#scanInput").value = "";
+      return;
+    }
+    const typed = normalizeOrderQuery($("#search")?.value || state.search || "");
+    const full = typed && typed !== oname ? findOrderByCode(typed + raw) : null;
+    if (full) {
+      state.currentId = full.id;
+      $("#search").value = full.name;
+      state.search = full.name;
+      beep(true);
+      renderAll();
+      $("#scanInput")?.focus();
+      return;
+    }
+  }
+  if (!order) {
+    beep(false);
+    toast("No open order needs that barcode", "bad");
+    setScanStatus(`Scan rejected: no open order needs ${raw}`, "bad");
+    return;
+  }
+
+  const line = findMatchingLine(order, raw);
+  if (!line) {
+    beep(false);
+    showNotOnOrder(raw);
+    setScanStatus(`Scan rejected: ${raw} is not on ${order.name}`, "bad");
+    const el = $(".item");
+    el?.classList.add("wrong-flash");
+    return;
+  }
+  if (line.remaining <= 0) {
+    beep(false);
+    toast("Already fulfilled on Shopify", "bad");
+    setScanStatus(`Scan rejected: ${line.title} is already fulfilled`, "bad");
+    showWarn(
+      "Already fulfilled",
+      `${line.title}${line.sku ? " (" + line.sku + ")" : ""} is already fulfilled on Shopify.`
+    );
+    return;
+  }
+  const current = pickCount(order.id, line.id);
+  if (current >= line.remaining) {
+    beep(false);
+    toast("Line already fully picked", "bad");
+    setScanStatus(`Scan rejected: ${line.title} is already fully picked`, "bad");
+    showWarn(
+      "Too many items scanned",
+      `${line.title}${line.sku ? " (" + line.sku + ")" : ""} is already fully picked (${current} of ${line.remaining} scanned).`
+    );
+    return;
+  }
+  const pack = currentPackQty();
+  const left = line.remaining - current;
+  if (pack > left) {
+    beep(false);
+    setScanStatus(`Scan rejected: ${state.packMode} exceeds the ${left} units left`, "bad");
+    showWarn(
+      "Pack size too large",
+      `${state.packMode} is ${pack} units, but only ${left} left on this line.`
+    );
+    return;
+  }
+  const add = pack;
+  if (state.autoFill.enabled && state.autoFill.orderId === order.id) {
+    const cartonLeft = state.autoFill.cartonQty - pickedOf(order);
+    if (add > cartonLeft) {
+      beep(false);
+      setScanStatus(`Scan rejected: only ${cartonLeft} units fit in this carton`, "bad");
+      showWarn(
+        "Carton quantity exceeded",
+        `${state.packMode} is ${add} units, but this Auto-fill carton only has room for ${cartonLeft}.`
+      );
+      return;
+    }
+  }
+  setPick(order.id, line.id, current + add, line.remaining);
+  beep(true);
+  const next = current + add;
+  const packNote = pack > 1 ? ` · ${state.packMode}×${pack}` : "";
+  toast(`Picked ${line.title} +${add}${packNote} (${next}/${line.remaining})`);
+  renderAll();
+  setScanStatus(`Last scan: picked ${line.title} +${add} (${next}/${line.remaining})`, "ok");
+  await runAutoFillIfReady(order.id);
+}
+
+async function loadOrders() {
+  $("#refreshBtn").disabled = true;
+  try {
+    if (state.mode === "live") {
+      if (!ShopifyAPI.configured()) {
+        toast("Connect Shopify in Settings first", "bad");
+        state.mode = "demo";
+        localStorage.setItem("packscan_mode", "demo");
+      } else {
+        state.orders = await ShopifyAPI.fetchOpenOrders();
+        rememberChannels(state.orders);
+        toast(`Loaded ${state.orders.length} Shopify orders`);
+      }
+    }
+    if (state.mode === "demo") {
+      const raw = JSON.parse(JSON.stringify(window.DEMO_ORDERS));
+      state.orders = raw;
+    }
+    rememberChannels(state.orders);
+    if (state.currentId && !state.orders.some((o) => o.id === state.currentId)) state.currentId = null;
+    await autoFulfillNoPickLines();
+    renderAll();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || "Failed to load orders", "bad");
+  } finally {
+    $("#refreshBtn").disabled = false;
+  }
+}
+
+async function autoFulfillNoPickLines() {
+  if (!state.autoNoPick) state.autoNoPick = {};
+  for (const order of state.orders) {
+    const groups = {};
+    for (const fo of order.fulfillmentOrders || []) {
+      const items = (fo.lineItems || [])
+        .filter((li) => isNoPickLine(li) && (li.remaining || 0) > 0)
+        .map((li) => ({ ...li, picked: li.remaining }));
+      if (items.length) groups[fo.id] = items;
+    }
+    if (!Object.keys(groups).length) continue;
+    const key = order.id;
+    if (state.autoNoPick[key]) continue;
+    state.autoNoPick[key] = true;
+    if (state.mode !== "live") {
+      for (const items of Object.values(groups)) {
+        for (const item of items) {
+          const li = order.fulfillmentOrders.flatMap((fo) => fo.lineItems).find((x) => x.id === item.id);
+          if (li) li.remaining = 0;
+        }
+      }
+      continue;
+    }
+    try {
+      for (const [foId, items] of Object.entries(groups)) {
+        await ShopifyAPI.fulfillItems(foId, items, false, null);
+      }
+    } catch (err) {
+      state.autoNoPick[key] = false;
+      console.warn("auto no-pick fulfill", err);
+    }
+  }
+}
+
+async function fulfillGroups(groups, order, trackingOverride, options = {}) {
+  if (!Object.keys(groups).length) {
+    toast("Nothing to fulfill", "bad");
+    return false;
+  }
+
+  if (state.mode !== "live") {
+    for (const items of Object.values(groups)) {
+      for (const item of items) {
+        const li = order.fulfillmentOrders.flatMap((fo) => fo.lineItems).find((x) => x.id === item.id);
+        if (li) li.remaining = Math.max(0, li.remaining - (item.picked || 0));
+      }
+    }
+    state.pick[order.id] = {};
+    if (remainingOf(order) === 0) order.displayFulfillmentStatus = "FULFILLED";
+    toast("Demo: marked fulfilled (not sent to Shopify)");
+    if (remainingOf(order) === 0) afterOrderDone();
+    else renderAll();
+    return true;
+  }
+
+  $("#fulfillBtn") && ($("#fulfillBtn").disabled = true);
+  try {
+    const notify = ShopifyAPI.settings().notify;
+    const carton = $("#cartonWeight") ? readCartonForm(order.id) : cartonOf(order.id);
+    const companyName = ({ fedex: "FedEx", ups: "UPS", usps: "USPS", ltl: "LTL", other: "Other" })[carton.carrier] || "FedEx";
+    const tracking = trackingOverride || (carton.tracking ? { company: companyName, number: carton.tracking } : null);
+    for (const [foId, items] of Object.entries(groups)) {
+      await ShopifyAPI.fulfillItems(foId, items, notify, tracking);
+    }
+    const extra = carton.weight ? ` · ${carton.weight} lb ${carton.service}` : "";
+    toast(`Shopify fulfillment created${extra}`);
+    state.pick[order.id] = {};
+    await loadOrders();
+    const refreshed = state.orders.find((item) => item.id === order.id);
+    if (options.preserveSelection && refreshed && remainingOf(refreshed) > 0) {
+      state.currentId = order.id;
+      renderAll();
+      $("#scanInput")?.focus();
+    } else {
+      afterOrderDone();
+    }
+    return true;
+  } catch (err) {
+    toast(err.message || "Fulfillment failed", "bad");
+    return false;
+  }
+}
+
+async function unfillCurrent() {
+  const order = currentOrder();
+  if (!order) return;
+  if (!confirm("Unfill " + order.name + "? This cancels fulfillments and puts units back to pick.")) return;
+  state.pick[order.id] = {};
+  if (state.mode !== "live") {
+    for (const fo of order.fulfillmentOrders || []) {
+      for (const li of fo.lineItems || []) {
+        if (li.qty) li.remaining = li.qty;
+      }
+    }
+    order.displayFulfillmentStatus = "UNFULFILLED";
+    toast("Demo: items unfilled");
+    renderAll();
+    $("#scanInput")?.focus();
+    return;
+  }
+  try {
+    const n = await ShopifyAPI.cancelFulfillments(order);
+    await loadOrders();
+    state.currentId = order.id;
+    renderAll();
+    toast(n ? `Unfilled ${n} fulfillment(s)` : "No Shopify fulfillments to cancel — picks cleared");
+    $("#scanInput")?.focus();
+  } catch (err) {
+    toast(err.message || "Unfill failed. Add write_fulfillments to the app scopes and reinstall.", "bad");
+  }
+}
+
+async function fulfillCurrent(options = {}) {
+  const order = currentOrder();
+  if (!order) return;
+  const pickedMap = state.pick[order.id] || {};
+  const groups = {};
+  for (const fo of order.fulfillmentOrders) {
+    const items = fo.lineItems
+      .map((li) => ({ ...li, picked: pickedMap[li.id] || 0 }))
+      .filter((li) => li.picked > 0);
+    if (items.length) groups[fo.id] = items;
+  }
+  if (!Object.keys(groups).length) {
+    toast("Scan items first, or use Fulfill all", "bad");
+    return false;
+  }
+  return fulfillGroups(groups, order, undefined, options);
+}
+
+function stopAutoFill(message = "Auto-fill turned off") {
+  state.autoFill.enabled = false;
+  if (!state.autoFill.busy) state.autoFill.orderId = null;
+  renderAll();
+  toast(message);
+  if (state.currentId) $("#scanInput")?.focus();
+}
+
+function toggleAutoFill() {
+  const order = currentOrder();
+  if (!order) return;
+  if (state.autoFill.enabled && state.autoFill.orderId === order.id) {
+    stopAutoFill(state.autoFill.busy
+      ? "Auto-fill will stop after the current carton closes"
+      : "Auto-fill turned off");
+    return;
+  }
+  const carton = $("#cartonWeight") ? readCartonForm(order.id) : cartonOf(order.id);
+  const boxSelect = $("#autoFillBox");
+  boxSelect.innerHTML = boxOptionsHtml(carton.box);
+  boxSelect.value = carton.box || "";
+  $("#autoFillQty").value = state.autoFill.cartonQty > 0 ? state.autoFill.cartonQty : 1;
+  openModal("#autoFillModal");
+  setTimeout(() => $("#autoFillQty")?.select(), 0);
+}
+
+function startAutoFill() {
+  const order = currentOrder();
+  if (!order) return closeModals();
+  const cartonQty = Number($("#autoFillQty").value);
+  if (!Number.isInteger(cartonQty) || cartonQty < 1) {
+    return toast("Enter a carton quantity of at least 1 unit", "bad");
+  }
+  const carton = cartonOf(order.id);
+  const carrier = useShopifyShipping() ? "shopify" : (carton.carrier || "fedex");
+  const thermalEnabled = $("#fedexThermalInput")?.checked || localStorage.getItem("packscan_fedex_thermal") === "1";
+  if (carrier !== "fedex" || !thermalEnabled) {
+    return toast("Auto-fill requires FedEx Zebra thermal printing to be enabled", "bad");
+  }
+  if (!localStorage.getItem("packscan_zebra_printer")) {
+    return toast("Discover and select a Zebra printer in Settings first", "bad");
+  }
+  state.autoFill.enabled = true;
+  state.autoFill.orderId = order.id;
+  state.autoFill.cartonQty = cartonQty;
+  state.autoFill.box = $("#autoFillBox").value || "";
+  state.autoFill.busy = false;
+  if (state.autoFill.box !== "") applyAutoFillBox(order.id);
+  closeModals();
+  renderAll();
+  toast(`Auto-fill on · ${cartonQty} units per carton`);
+  $("#scanInput")?.focus();
+  runAutoFillIfReady(order.id);
+}
+
+async function runAutoFillIfReady(orderId) {
+  const config = state.autoFill;
+  if (!config.enabled || config.busy || config.orderId !== orderId) return;
+  const order = state.orders.find((item) => item.id === orderId);
+  if (!order) return;
+  const picked = pickedOf(order);
+  if (!picked || (picked < config.cartonQty && picked < remainingOf(order))) return;
+
+  config.busy = true;
+  renderAll();
+  const labelPrinted = await printFedexLabel({ deferPackingSlip: true });
+  if (!labelPrinted) {
+    config.busy = false;
+    stopAutoFill("Auto-fill stopped because the label did not print");
+    return;
+  }
+
+  const fulfilled = await fulfillCurrent({ preserveSelection: true });
+  config.busy = false;
+  if (!fulfilled) {
+    stopAutoFill("Auto-fill stopped because the carton could not be closed");
+    return;
+  }
+
+  const refreshed = state.orders.find((item) => item.id === orderId);
+  if (!refreshed || remainingOf(refreshed) === 0) {
+    config.enabled = false;
+    config.orderId = null;
+    afterOrderDone();
+    toast("Order fulfilled · Auto-fill turned off");
+    return;
+  }
+
+  if (!config.enabled) {
+    config.orderId = null;
+    renderAll();
+    toast("Carton closed · Auto-fill is off");
+    $("#scanInput")?.focus();
+    return;
+  }
+
+  const carton = cartonOf(orderId);
+  carton.tracking = "";
+  carton.rates = null;
+  if (config.box !== "") applyAutoFillBox(orderId);
+  state.currentId = orderId;
+  renderAll();
+  toast(`Carton closed · Auto-fill ready for ${config.cartonQty} more units`);
+  $("#scanInput")?.focus();
+}
+
+async function fulfillEntireOrder() {
+  const order = currentOrder();
+  if (!order) return;
+  const remaining = remainingOf(order);
+  if (!remaining) return toast("Nothing left to fulfill", "bad");
+  const carton = cartonOf(order.id);
+  if ($("#cartonTracking")) readCartonForm(order.id);
+  $("#fulfillCarrier").value = "FedEx";
+  if ($("#fulfillCarrierOther")) $("#fulfillCarrierOther").value = "";
+  if ($("#otherCarrierWrap")) $("#otherCarrierWrap").style.display = "none";
+  $("#fulfillTracking").value = carton.tracking || "";
+  openModal("#fulfillModal");
+}
+
+async function confirmFulfillAll() {
+  const order = currentOrder();
+  if (!order) return closeModals();
+  const groups = {};
+  for (const fo of order.fulfillmentOrders) {
+    const items = fo.lineItems
+      .filter((li) => li.remaining > 0)
+      .map((li) => ({ ...li, picked: li.remaining }));
+    if (items.length) groups[fo.id] = items;
+  }
+  const number = $("#fulfillTracking").value.trim();
+  let company = $("#fulfillCarrier").value || "FedEx";
+  if (company === "Other") {
+    company = ($("#fulfillCarrierOther").value || "").trim();
+    if (!company) return toast("Enter the carrier name", "bad");
+  }
+  if (number) {
+    cartonOf(order.id).tracking = number;
+    const box = $("#cartonTracking");
+    if (box) box.value = number;
+  }
+  closeModals();
+  return fulfillGroups(groups, order, number ? { company, number } : { company, number: "" });
+}
+
+async function fulfillOneLine(lineId) {
+  const order = currentOrder();
+  if (!order) return;
+  const groups = {};
+  for (const fo of order.fulfillmentOrders) {
+    const items = fo.lineItems
+      .filter((li) => li.id === lineId && li.remaining > 0)
+      .map((li) => ({ ...li, picked: li.remaining }));
+    if (items.length) groups[fo.id] = items;
+  }
+  return fulfillGroups(groups, order);
+}
+
+function openModal(id) {
+  $(id).classList.add("open");
+}
+function closeModals() {
+  $$(".modal-bg").forEach((m) => m.classList.remove("open"));
+}
+
+function applyTheme(theme) {
+  document.body.classList.remove("theme-light", "theme-dark", "theme-colorful");
+  if (theme && theme !== "default") {
+    document.body.classList.add("theme-" + theme);
+  }
+}
+if (localStorage.getItem("packscan_theme") === null) {
+  localStorage.setItem("packscan_theme", "default");
+}
+applyTheme(localStorage.getItem("packscan_theme"));
+if (fedexSettings().isDemo) {
+  const banner = document.getElementById("fedexDemoBanner");
+  if (banner) banner.style.display = "block";
+}
+
+
+async function recordLabelHistory(order, carrier, data) {
+  try {
+    const addr = order?.shippingAddress || {};
+    await fetch("/api/labels/record", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        carrier,
+        orderId: order?.id || "",
+        orderName: order?.name || "",
+        customerName: customerName(order),
+        company: addr.company || "",
+        trackingNumber: data?.trackingNumber || "",
+        stampsTxId: data?.stampsTxId || "",
+        sandbox: carrier === "fedex" && fedexSettings().sandbox,
+      }),
+    });
+  } catch (err) {
+    console.warn("Failed to record label history", err);
+  }
+}
+
+async function loadLabelHistory() {
+  const box = $("#historyBody");
+  if (!box) return;
+  box.innerHTML = `<p class="meta">Loading…</p>`;
+  try {
+    const res = await fetch("/api/labels/history?hours=24");
+    const data = await res.json();
+    renderHistory(data.labels || []);
+  } catch (err) {
+    box.innerHTML = `<p class="meta">Failed to load history: ${err.message}</p>`;
+  }
+}
+
+function renderHistory(labels) {
+  const box = $("#historyBody");
+  if (!box) return;
+  if (!labels.length) {
+    box.innerHTML = `<p class="meta">No labels created in the past 24 hours.</p>`;
+    return;
+  }
+  const rows = labels
+    .map((l) => {
+      const date = new Date(l.createdAt * 1000).toLocaleString();
+      const status = l.voided
+        ? `<span class="help">Voided</span>`
+        : `<button class="ghost-btn void-label-btn" data-id="${l.id}" type="button">Void</button>`;
+      return `<tr class="${l.voided ? "voided-row" : ""}">
+        <td>${l.orderName || ""}</td>
+        <td>${l.customerName || ""}</td>
+        <td>${l.company || ""}</td>
+        <td>${date}</td>
+        <td>${l.trackingNumber || ""}</td>
+        <td>${(l.carrier || "").toUpperCase()}</td>
+        <td>${status}</td>
+      </tr>`;
+    })
+    .join("");
+  box.innerHTML = `
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Order</th><th>Customer</th><th>Company</th><th>Date</th><th>Tracking #</th><th>Carrier</th><th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  box.querySelectorAll(".void-label-btn").forEach((btn) => {
+    btn.addEventListener("click", () => voidLabel(btn.dataset.id, labels));
+  });
+}
+
+async function voidLabel(id, labels) {
+  const label = labels.find((l) => l.id === id);
+  if (!label) return;
+  if (!confirm(`Void label for order ${label.orderName || ""} (tracking ${label.trackingNumber || ""})?`)) return;
+  let creds = {};
+  if (label.carrier === "fedex") {
+    creds = fedexSettings();
+    if (typeof label.sandbox === "boolean") {
+      creds.sandbox = label.sandbox;
+      creds.useServerSandbox = label.sandbox;
+    }
+  }
+  else if (label.carrier === "ups") creds = upsSettings();
+  else if (label.carrier === "usps" || label.carrier === "stamps") creds = stampsSettings();
+  try {
+    const res = await fetch("/api/labels/void", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...creds, id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Void failed");
+    toast("Label voided");
+    loadLabelHistory();
+  } catch (err) {
+    toast(err.message || "Void failed", "bad");
+  }
+}
+
+
+async function startCamera() {
+  openModal("#scanModal");
+  if (!window.Html5Qrcode) {
+    $("#reader").innerHTML = "<p class='help'>Scanner library failed to load.</p>";
+    return;
+  }
+  await stopCamera();
+  const qr = new Html5Qrcode("reader");
+  state.scanner = qr;
+  state.lastCamScan = { text: "", at: 0 };
+  const onRead = (text) => {
+    const t = String(text || "").trim();
+    if (!t) return;
+    const now = Date.now();
+    if (t === state.lastCamScan.text && now - state.lastCamScan.at < 1500) return;
+    state.lastCamScan = { text: t, at: now };
+    applyScan(t);
+  };
+  try {
+    let cameraId = { facingMode: "environment" };
+    try {
+      const cams = await Html5Qrcode.getCameras();
+      const back = (cams || []).find((c) => /back|rear|environment/i.test(c.label));
+      if (back) cameraId = back.id;
+      else if (cams && cams[0]) cameraId = cams[cams.length - 1].id;
+    } catch (_) {}
+    await qr.start(
+      cameraId,
+      {
+        fps: 16,
+        qrbox: { width: 320, height: 180 },
+        formatsToSupport: window.Html5QrcodeSupportedFormats
+          ? [
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.CODE_39,
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.ITF,
+              Html5QrcodeSupportedFormats.QR_CODE,
+            ]
+          : undefined,
+      },
+      onRead
+    );
+  } catch (err) {
+    $("#reader").innerHTML = `<p class="help">Camera error: ${err.message || err}. On iPhone use Safari over https, tap Allow, and keep this sheet open. You can still type the barcode.</p>`;
+  }
+}
+
+async function stopCamera() {
+  if (state.scanner) {
+    try {
+      await state.scanner.stop();
+      state.scanner.clear();
+    } catch (_) {}
+    state.scanner = null;
+  }
+}
+
+const ALL_SERVICES = [
+  ["FEDEX_GROUND", "FedEx Ground (business)"],
+  ["FEDEX_HOME", "FedEx Home Delivery"],
+  ["FEDEX_EXPRESS_SAVER", "FedEx Express Saver"],
+  ["FEDEX_2DAY", "FedEx 2Day"],
+  ["FEDEX_2DAY_AM", "FedEx 2Day AM"],
+  ["FEDEX_STANDARD_OVERNIGHT", "FedEx Standard Overnight"],
+  ["FEDEX_PRIORITY_OVERNIGHT", "FedEx Priority Overnight"],
+  ["FEDEX_FIRST_OVERNIGHT", "FedEx First Overnight"],
+  ["UPS_GROUND", "UPS Ground"],
+  ["UPS_3DAY", "UPS 3 Day Select"],
+  ["UPS_2DAY", "UPS 2nd Day Air"],
+  ["UPS_NEXT", "UPS Next Day Air"],
+  ["USPS_GA", "USPS Ground Advantage"],
+  ["USPS_PRIORITY", "USPS Priority Mail"],
+  ["USPS_EXPRESS", "USPS Priority Mail Express"],
+];
+
+const CARRIER_SERVICES = {
+  fedex: [
+    "FEDEX_GROUND",
+    "FEDEX_HOME",
+    "FEDEX_EXPRESS_SAVER",
+    "FEDEX_2DAY",
+    "FEDEX_2DAY_AM",
+    "FEDEX_STANDARD_OVERNIGHT",
+    "FEDEX_PRIORITY_OVERNIGHT",
+    "FEDEX_FIRST_OVERNIGHT",
+  ],
+  ups: ["UPS_GROUND", "UPS_3DAY", "UPS_2DAY", "UPS_NEXT"],
+  usps: ["USPS_GA", "USPS_PRIORITY", "USPS_EXPRESS"],
+  stamps: ["USPS_GA", "USPS_PRIORITY", "USPS_EXPRESS"],
+  shopify: ["SHOPIFY"],
+  ltl: ["OTHER"],
+  other: ["OTHER"],
+};
+
+const SERVICE_LABELS = Object.fromEntries(ALL_SERVICES);
+SERVICE_LABELS.SHOPIFY = "Shopify Shipping";
+SERVICE_LABELS.OTHER = "Enter tracking manually";
+
+function servicesForCarrier(carrier) {
+  return CARRIER_SERVICES[carrier] || CARRIER_SERVICES.fedex;
+}
+
+function serviceOptionsHtml(carrier, selected) {
+  return servicesForCarrier(carrier)
+    .filter((key) => key === "SHOPIFY" || key === "OTHER" || enabledServices()[key] !== false)
+    .map((key) => `<option value="${key}" ${selected === key ? "selected" : ""}>${SERVICE_LABELS[key]}</option>`)
+    .join("");
+}
+
+function enabledServices() {
+  try {
+    const raw = localStorage.getItem("packscan_services");
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return Object.fromEntries(ALL_SERVICES.map(([k]) => [k, true]));
+}
+
+function persistAllSettingsFields() {
+  persistShopifyFields();
+  localStorage.setItem("packscan_notify", $("#notifyInput").checked ? "1" : "0");
+  state.sound = $("#soundInput").checked;
+  localStorage.setItem("packscan_sound", state.sound ? "1" : "0");
+  localStorage.setItem("packscan_view_barcode", $("#viewBarcodeInput").checked ? "1" : "0");
+  localStorage.setItem("packscan_view_packing_list", $("#viewPackingListInput").checked ? "1" : "0");
+  localStorage.setItem("packscan_order_limit", $("#orderLimitInput").value);
+  localStorage.setItem("packscan_shopify_shipping", $("#shopifyShipInput")?.checked ? "1" : "0");
+  savePackDefaultsFromForm();
+  saveBoxesFromForm();
+  state.mode = $("#modeInput").value;
+  localStorage.setItem("packscan_mode", state.mode);
+  localStorage.setItem("packscan_theme", $("#themeInput").value);
+}
+
+function exportSettingsFile() {
+  // Make sure anything currently typed into the Settings form (including keys
+  // not yet saved with the Save button) is captured before exporting.
+  persistAllSettingsFields();
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith("packscan_") && !SHOPIFY_SENSITIVE_STORAGE_KEYS.includes(k)) data[k] = localStorage.getItem(k);
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "packscan-settings.json";
+  a.click();
+  toast("Saved packscan-settings.json — copy that file to the other PC");
+}
+
+async function importSettingsFile(e) {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || typeof data !== "object") throw new Error("Not a settings file");
+    Object.entries(data).forEach(([k, v]) => {
+      if (k.startsWith("packscan_") && !SHOPIFY_SENSITIVE_STORAGE_KEYS.includes(k)) localStorage.setItem(k, String(v));
+    });
+    toast("Settings imported — reloading");
+    location.reload();
+  } catch (err) {
+    toast(err.message || "Import failed", "bad");
+  }
+}
+
+function persistEnabledServices() {
+  const map = enabledServices();
+  $$(".svc-toggle").forEach((el) => {
+    map[el.dataset.svc] = el.checked;
+  });
+  localStorage.setItem("packscan_services", JSON.stringify(map));
+}
+
+function loadEnabledServices() {
+  const map = enabledServices();
+  $$(".svc-toggle").forEach((el) => {
+    el.checked = map[el.dataset.svc] !== false;
+  });
+}
+
+function persistShopifyFields() {
+  localStorage.setItem("packscan_fedex_key", $("#fedexKeyInput").value.trim());
+  localStorage.setItem("packscan_fedex_secret", $("#fedexSecretInput").value.trim());
+  localStorage.setItem("packscan_fedex_account", $("#fedexAccountInput").value.trim());
+  localStorage.setItem("packscan_fedex_sandbox", $("#fedexSandboxInput").checked ? "1" : "0");
+  localStorage.setItem("packscan_ups_id", $("#upsIdInput").value.trim());
+  localStorage.setItem("packscan_ups_secret", $("#upsSecretInput").value.trim());
+  localStorage.setItem("packscan_ups_account", $("#upsAccountInput").value.trim());
+  localStorage.setItem("packscan_ups_sandbox", $("#upsSandboxInput").checked ? "1" : "0");
+  localStorage.setItem("packscan_stamps_user", $("#stampsUserInput")?.value.trim() || "");
+  localStorage.setItem("packscan_stamps_pass", $("#stampsPassInput")?.value.trim() || "");
+  localStorage.setItem("packscan_stamps_id", $("#stampsIdInput")?.value.trim() || "");
+  localStorage.setItem("packscan_stamps_sandbox", $("#stampsSandboxInput")?.checked ? "1" : "0");
+  localStorage.setItem("packscan_from_name", $("#fromNameInput").value.trim());
+  localStorage.setItem("packscan_from_phone", $("#fromPhoneInput").value.trim());
+  localStorage.setItem("packscan_from_street", $("#fromStreetInput").value.trim());
+  localStorage.setItem("packscan_from_city", $("#fromCityInput").value.trim());
+  localStorage.setItem("packscan_from_state", $("#fromStateInput").value.trim());
+  localStorage.setItem("packscan_from_zip", $("#fromZipInput").value.trim());
+  localStorage.setItem("packscan_autoprint", $("#autoPrintInput").checked ? "1" : "0");
+  localStorage.setItem("packscan_fedex_thermal", $("#fedexThermalInput").checked ? "1" : "0");
+  localStorage.setItem("packscan_zebra_printer", $("#zebraPrinterInput").value || "");
+  localStorage.setItem("packscan_label_rot_ups", $("#labelRotUpsInput")?.value || "90");
+  localStorage.setItem("packscan_label_rot_fedex", $("#labelRotFedexInput")?.value || "0");
+  persistEnabledServices();
+  persistEnabledChannels();
+}
+
+function upsSettings() {
+  return {
+    clientId: localStorage.getItem("packscan_ups_id") || "",
+    clientSecret: localStorage.getItem("packscan_ups_secret") || "",
+    accountNumber: localStorage.getItem("packscan_ups_account") || "",
+    sandbox: localStorage.getItem("packscan_ups_sandbox") === "1",
+    shipper: fedexSettings().shipper,
+  };
+}
+
+function uspsSettings() {
+  return stampsSettings();
+}
+
+function stampsSettings() {
+  return {
+    username: localStorage.getItem("packscan_stamps_user") || "",
+    password: localStorage.getItem("packscan_stamps_pass") || "",
+    integrationId: localStorage.getItem("packscan_stamps_id") || "",
+    sandbox: localStorage.getItem("packscan_stamps_sandbox") === "1",
+    shipper: fedexSettings().shipper,
+  };
+}
+
+function fedexSettings() {
+  const sandbox = localStorage.getItem("packscan_fedex_sandbox") === "1";
+  const useServerSandbox = sandbox;
+  return {
+    apiKey: useServerSandbox ? "" : (localStorage.getItem("packscan_fedex_key") || ""),
+    secretKey: useServerSandbox ? "" : (localStorage.getItem("packscan_fedex_secret") || ""),
+    accountNumber: useServerSandbox ? "" : (localStorage.getItem("packscan_fedex_account") || ""),
+    sandbox,
+    useServerSandbox,
+    isDemo: useServerSandbox && window.PACKSCAN_DEMO_FEDEX_AVAILABLE === true,
+    shipper: useServerSandbox && !localStorage.getItem("packscan_from_name") ? {
+      name: "PackScan Demo",
+      phone: "9015551234",
+      address1: "1301 W Central Ave",
+      city: "Bentonville",
+      province: "AR",
+      zip: "72712",
+      country: "US",
+    } : {
+      name: localStorage.getItem("packscan_from_name") || "",
+      phone: localStorage.getItem("packscan_from_phone") || "",
+      address1: localStorage.getItem("packscan_from_street") || "",
+      city: localStorage.getItem("packscan_from_city") || "",
+      province: localStorage.getItem("packscan_from_state") || "",
+      zip: localStorage.getItem("packscan_from_zip") || "",
+      country: "US",
+    },
+  };
+}
+
+function loadZebraBrowserPrint() {
+  if (window.BrowserPrint) return Promise.resolve(window.BrowserPrint);
+  const serviceUrl = "http://localhost:9100";
+  const request = async (path, body) => {
+    const response = await fetch(serviceUrl + path, {
+      method: body ? "POST" : "GET",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) throw new Error(`Zebra Browser Print returned HTTP ${response.status}`);
+    return response.json();
+  };
+  const api = {
+    getLocalDevices: (success, error, type) => request(`/available?type=${encodeURIComponent(type || "printer")}`).then(success).catch(error),
+    getDefaultDevice: (success, error, type) => request(`/default?type=${encodeURIComponent(type || "printer")}`).then(success).catch(error),
+    write: (device, data, success, error) => request("/write", { device, data }).then(success).catch(error),
+  };
+  return Promise.resolve(api);
+}
+
+function discoverZebraPrinters() {
+  const select = $("#zebraPrinterInput");
+  if (!select) return;
+  select.innerHTML = '<option value="">Discovering printers…</option>';
+  loadZebraBrowserPrint().then((browserPrint) => new Promise((resolve, reject) => {
+    browserPrint.getLocalDevices((printers) => {
+      if (printers?.length) return resolve(printers);
+      if (typeof browserPrint.getDefaultDevice !== "function") return resolve([]);
+      browserPrint.getDefaultDevice((printer) => resolve(printer ? [printer] : []), reject, "printer");
+    }, reject, "printer");
+  })).then((printers) => {
+    const saved = localStorage.getItem("packscan_zebra_printer") || "";
+    select.innerHTML = '<option value="">Select a printer</option>';
+    (printers || []).forEach((printer) => {
+      const option = document.createElement("option");
+      option.value = printer.uid || printer.name;
+      option.textContent = printer.name || printer.uid;
+      option.dataset.printerName = printer.name || "";
+      select.appendChild(option);
+    });
+    if ([...select.options].some((option) => option.value === saved)) select.value = saved;
+    if (!printers?.length) throw new Error("No Zebra printers found. Confirm Browser Print is running and the printer is connected.");
+    toast(`${printers.length} Zebra printer${printers.length === 1 ? "" : "s"} found`);
+  }).catch((err) => {
+    select.innerHTML = '<option value="">No printers found</option>';
+    toast(err.message || "Could not discover Zebra printers", "bad");
+  });
+}
+
+function sendZplToSelectedPrinter(zplBase64) {
+  const printerId = localStorage.getItem("packscan_zebra_printer") || $("#zebraPrinterInput")?.value || "";
+  return loadZebraBrowserPrint().then((browserPrint) => new Promise((resolve, reject) => {
+    browserPrint.getLocalDevices((printers) => {
+      const choose = (available) => {
+        const printer = printerId
+          ? (available || []).find((item) => (item.uid || item.name) === printerId)
+          : (available || [])[0];
+        if (!printer) return reject(new Error("No Zebra printer is available"));
+        const binary = atob(zplBase64);
+        const failed = (error) => reject(new Error(error?.response || error?.message || "Zebra printer rejected the ZPL data"));
+        if (typeof printer.send === "function") {
+          printer.send(binary, resolve, failed);
+        } else {
+          browserPrint.write(printer, binary, resolve, failed);
+        }
+
+      };
+      if (printers?.length) return choose(printers);
+      if (typeof browserPrint.getDefaultDevice !== "function") return choose([]);
+      browserPrint.getDefaultDevice((printer) => choose(printer ? [printer] : []), reject, "printer");
+    }, reject, "printer");
+  }));
+}
+
+function sendZplToPrinter(zpl, printerId) {
+  const encoded = btoa(zpl);
+  if (printerId) localStorage.setItem("packscan_zebra_printer", printerId);
+  return sendZplToSelectedPrinter(encoded);
+}
+
+async function testZebraPrinter() {
+  const select = $("#zebraPrinterInput");
+  const printerId = select?.value || localStorage.getItem("packscan_zebra_printer") || "";
+  const testLabel = [
+    "^XA",
+    "^PW812",
+    "^LL1218",
+    "^FO50,80^A0N,42,42^FDPackScan Test Label^FS",
+    "^FO50,150^A0N,28,28^FDZPLII direct print test^FS",
+    "^FO50,210^A0N,24,24^FDZebra ZP500 (ZPL)^FS",
+    "^FO50,280^BY3",
+    "^BCN,100,Y,N,N^FDPACKSCAN-TEST^FS",
+    "^XZ"
+  ].join("\n");
+  if (!printerId && !localStorage.getItem("packscan_zebra_printer")) {
+    throw new Error("Click Discover and select a Zebra printer first");
+  }
+  await sendZplToPrinter(testLabel, printerId);
+}
+
+function serviceType(code) {
+  return {
+    FEDEX_GROUND: "FEDEX_GROUND",
+    FEDEX_HOME: "GROUND_HOME_DELIVERY",
+    FEDEX_EXPRESS_SAVER: "FEDEX_EXPRESS_SAVER",
+    FEDEX_2DAY: "FEDEX_2_DAY",
+    FEDEX_2DAY_AM: "FEDEX_2_DAY_AM",
+    FEDEX_STANDARD_OVERNIGHT: "STANDARD_OVERNIGHT",
+    FEDEX_PRIORITY_OVERNIGHT: "PRIORITY_OVERNIGHT",
+    FEDEX_FIRST_OVERNIGHT: "FIRST_OVERNIGHT",
+  }[code] || "FEDEX_GROUND";
+}
+
+function scannedLines(order) {
+  return order.fulfillmentOrders.flatMap((fo) => fo.lineItems)
+    .map((li) => ({ ...li, scanned: pickCount(order.id, li.id) }))
+    .filter((li) => li.scanned > 0);
+}
+
+function slipInnerHtml(order, lines) {
+  const addr = order.shippingAddress || {};
+  const addrLine = [addr.address1, addr.address2, addr.city, addr.provinceCode, addr.zip].filter(Boolean).join(", ");
+  const rows = lines.map((li) =>
+    `<tr><td>${li.title}</td><td>${li.sku || ""}</td><td>${li.barcode || ""}</td><td class="qty">${li.scanned}</td></tr>`
+  ).join("");
+  return `<h1>${order.name} · ${customerName(order)}${addr.company ? " · " + addr.company : ""}</h1>
+    <p class="meta">${addrLine}${order.note ? "<br>" + order.note : ""}</p>
+    <table><thead><tr><th>Item</th><th>SKU</th><th>Barcode</th><th class="qty">Qty</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <p class="meta" style="margin-top:12px">${lines.reduce((n, li) => n + li.scanned, 0)} units scanned</p>
+    <div class="slip-footer">PackScan for Shopify — PackScan.Shop</div>`;
+}
+
+function openPrintHtml(title, bodyInner) {
+  const html = `<!DOCTYPE html><html><head><title>${title}</title><style>
+    body { font-family: Arial, sans-serif; color: #111; margin: 0; font-size: 13px; }
+    h1 { font-size: 18px; margin: 0 0 6px; }
+    .meta { color: #333; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #ccc; text-align: left; padding: 6px 4px; }
+    th { font-size: 11px; text-transform: uppercase; color: #555; }
+    td.qty { text-align: right; font-weight: 700; width: 48px; }
+    .label-page { width: 4in; height: 6in; page-break-after: always; overflow: hidden; position: relative; }
+    .label-page img { width: 4in; height: 6in; object-fit: fill; display: block; }
+    .slip-page { width: 4in; height: 6in; padding: 10px 12px 28px; box-sizing: border-box; position: relative; }
+    .slip-footer { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; font-size: 7pt; font-style: italic; font-weight: 400; color: #888; text-align: center; letter-spacing: 0.02em; }
+    @page { margin: 0; }
+  </style></head><body>${bodyInner}
+    <script>window.onload=function(){setTimeout(function(){window.focus();window.print();},300);}<` + `/script>
+  </body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) return toast("Allow pop-ups to print", "bad");
+  w.document.write(html);
+  w.document.close();
+}
+
+function printSlip() {
+  const order = currentOrder();
+  if (!order) return;
+  const lines = scannedLines(order);
+  if (!lines.length) return toast("Scan items first", "bad");
+  openPrintHtml("Slip " + order.name, `<div class="slip-page">${slipInnerHtml(order, lines)}</div>`);
+}
+
+function zplText(value) {
+  return String(value || "")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/[\^~\\]/g, " ");
+}
+
+function slipZpl(order) {
+  let lines = scannedLines(order);
+  if (!lines.length) {
+    lines = order.fulfillmentOrders.flatMap((fo) => fo.lineItems)
+      .filter((li) => (li.remaining || 0) > 0)
+      .map((li) => ({ ...li, scanned: li.remaining }));
+  }
+  if (!lines.length) return "";
+  const addr = order.shippingAddress || {};
+  const address = [addr.address1, addr.address2, addr.city, addr.provinceCode, addr.zip]
+    .filter(Boolean).join(", ");
+  const total = lines.reduce((sum, line) => sum + Number(line.scanned || 0), 0);
+  const zpl = [
+    "^XA", "^PW812", "^LL1218",
+    "^FO45,45^A0N,36,36^FD" + zplText(order.name) + " - " + zplText(customerName(order)) + (addr.company ? " - " + zplText(addr.company) : "") + "^FS",
+    "^FO45,95^A0N,25,25^FD" + zplText(address) + "^FS",
+    "^FO45,155^GB720,2,2^FS",
+  ];
+  let y = 190;
+  lines.forEach((line) => {
+    zpl.push("^FO45," + y + "^A0N,25,25^FD" + zplText(line.title).slice(0, 38) + "^FS");
+    zpl.push("^FO45," + (y + 28) + "^A0N,20,20^FDSKU: " + zplText(line.sku || "N/A").slice(0, 38) + "^FS");
+    zpl.push("^FO600," + y + "^A0N,28,28^FDQty: " + zplText(line.scanned) + "^FS");
+    y += 75;
+  });
+  zpl.push(
+    "^FO45," + Math.min(y + 15, 1080) + "^GB720,2,2^FS",
+    "^FO45," + Math.min(y + 45, 1120) + "^A0N,28,28^FD" + total + " units^FS",
+    "^FO45,1160^A0N,20,20^FDPackScan for Shopify - PackScan.Shop^FS",
+    "^XZ"
+  );
+  return zpl.join("\n");
+}
+
+async function printSlipForOrder(order) {
+  if (!order) return;
+  const zpl = slipZpl(order);
+  if (!zpl) throw new Error("No items available for packing slip");
+  await sendZplToPrinter(zpl);
+}
+
+function labelRotation(carrier) {
+  const key = carrier === "fedex" ? "packscan_label_rot_fedex" : "packscan_label_rot_ups";
+  const fallback = carrier === "fedex" ? "0" : "90";
+  const n = parseInt(localStorage.getItem(key) || fallback, 10);
+  return [0, 90, 180, 270].includes(n) ? n : parseInt(fallback, 10);
+}
+
+function labelPrintHtml(base64, mime, extraPages, carrier) {
+  const rot = labelRotation(carrier || "ups");
+  const rotCss = rot === 90 || rot === 270
+    ? `left:50%;top:50%;width:6in;height:4in;transform:translate(-50%,-50%) rotate(${rot}deg);`
+    : `left:0;top:0;width:4in;height:6in;transform:rotate(${rot}deg);`;
+  return `<!DOCTYPE html><html><head><style>
+    @page { size: 4in 6in; margin: 0; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #111; font-family: Arial, sans-serif; font-size: 12px; }
+    .label-page { width: 4in; height: 6in; overflow: hidden; position: relative; page-break-after: always; }
+    .label-page img { position: absolute; object-fit: fill; display: block; transform-origin: center center; ${rotCss} }
+    .slip-page { width: 4in; height: 6in; padding: 10px 12px 26px; box-sizing: border-box; position: relative; page-break-before: always; }
+    .slip-footer { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; font-size: 7pt; font-style: italic; color: #888; text-align: center; }
+    h1 { font-size: 16px; margin: 0 0 6px; }
+    .meta { margin: 0 0 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #ccc; text-align: left; padding: 5px 3px; }
+    td.qty { text-align: right; font-weight: 700; }
+  </style></head><body>
+    <div class="label-page"><img id="lbl" src="data:${mime};base64,${base64}" /></div>
+    ${extraPages || ""}
+    <script>
+      (function(){
+        var img = document.getElementById("lbl");
+        function go(){
+          setTimeout(function(){ window.focus(); window.print(); }, 300);
+        }
+        if (img.complete && img.naturalWidth) go(); else img.onload = go;
+      })();
+    <\/script>
+  </body></html>`;
+}
+
+function printLabelAndSlip(base64, mime, order) {
+  let lines = order ? scannedLines(order) : [];
+  if (!lines.length && order) {
+    lines = order.fulfillmentOrders.flatMap((fo) => fo.lineItems)
+      .filter((li) => (li.remaining || 0) > 0)
+      .map((li) => ({ ...li, scanned: li.remaining }));
+  }
+  const slipPage = order && lines.length ? `<div class="slip-page">${slipInnerHtml(order, lines)}</div>` : "";
+  const frame = document.getElementById("labelFrame") || document.createElement("iframe");
+  frame.id = "labelFrame";
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(frame);
+  const carrier = (order && cartonOf(order.id).carrier) || "ups";
+  frame.srcdoc = labelPrintHtml(base64, mime, slipPage, carrier);
+}
+
+function printLabel(base64, mime, carrier) {
+  const frame = document.getElementById("labelFrame") || document.createElement("iframe");
+  frame.id = "labelFrame";
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(frame);
+  frame.srcdoc = labelPrintHtml(base64, mime, "", carrier || "ups");
+}
+
+function mapRateToSelect(serviceType) {
+  const t = String(serviceType || "").toUpperCase();
+  if (t === "GROUND_HOME_DELIVERY") return "FEDEX_HOME";
+  if (t === "FEDEX_GROUND") return "FEDEX_GROUND";
+  if (t.includes("EXPRESS_SAVER")) return "FEDEX_EXPRESS_SAVER";
+  if (t.includes("2_DAY_AM") || t.includes("2DAY_AM") || t.includes("2DAY AM")) return "FEDEX_2DAY_AM";
+  if (t.includes("2_DAY") || t.includes("2DAY")) return "FEDEX_2DAY";
+  if (t.includes("STANDARD_OVERNIGHT")) return "FEDEX_STANDARD_OVERNIGHT";
+  if (t.includes("PRIORITY_OVERNIGHT")) return "FEDEX_PRIORITY_OVERNIGHT";
+  if (t.includes("FIRST_OVERNIGHT")) return "FEDEX_FIRST_OVERNIGHT";
+  if (t === "03" || t.includes("UPS_GROUND") || t === "GROUND") return "UPS_GROUND";
+  if (t === "12" || t.includes("3DAY")) return "UPS_3DAY";
+  if (t === "02" || t.includes("2ND")) return "UPS_2DAY";
+  if (t === "01" || t.includes("NEXT")) return "UPS_NEXT";
+  if (t.includes("GROUND_ADVANTAGE") || t === "USPS_GA") return "USPS_GA";
+  if (t.includes("EXPRESS")) return "USPS_EXPRESS";
+  if (t.includes("PRIORITY")) return "USPS_PRIORITY";
+  return "FEDEX_GROUND";
+}
+
+function applyRate(row) {
+  const order = currentOrder();
+  if (!order) return;
+  const service = row.dataset.service;
+  const c = readCartonForm(order.id);
+  c.service = mapRateToSelect(service);
+  const t = String(service || "").toUpperCase();
+  if (t.includes("USPS") || t.includes("PRIORITY") || t.includes("GROUND_ADVANTAGE")) c.carrier = "usps";
+  else if (t === "03" || t === "02" || t === "01" || t === "12" || t.includes("UPS")) c.carrier = "ups";
+  else c.carrier = "fedex";
+  const sel = $("#cartonService");
+  if (sel) sel.value = c.service;
+  const car = $("#cartonCarrier");
+  if (car) car.value = c.carrier;
+  toast(row.querySelector("span")?.textContent + " selected");
+}
+
+async function loadFedexRates() {
+  const order = currentOrder();
+  if (!order) return;
+  const carton = readCartonForm(order.id);
+  if (!carton.weight) return toast("Enter carton weight first", "bad");
+  const addr = order.shippingAddress || {};
+  const recipient = {
+    name: customerName(order),
+    phone: (order.shippingAddress || {}).phone,
+    address1: addr.address1,
+    address2: addr.address2,
+    city: addr.city,
+    province: addr.provinceCode,
+    zip: addr.zip,
+    country: addr.countryCodeV2 || "US",
+  };
+  const carrier = useShopifyShipping() ? "shopify" : (carton.carrier || "fedex");
+  if (carrier === "shopify") {
+    const rates = [{
+      serviceType: "SHOPIFY",
+      serviceName: "Shopify Shipping · cheapest discounted label",
+      amount: "",
+      transit: "USPS / UPS / DHL · price at purchase",
+    }];
+    carton.rates = rates;
+    carton.carrier = "shopify";
+    carton.service = "SHOPIFY";
+    const box = $("#rateBox");
+    if (box) {
+      box.innerHTML = `
+        <div class="rate-list">
+          <button type="button" class="rate-row" data-service="SHOPIFY">
+            <span>Shopify Shipping</span>
+            <span class="meta">Discounted USPS / UPS / DHL</span>
+            <b>at print</b>
+          </button>
+        </div>
+        <p class="meta">This is Admin → Shipping labels, not checkout shipping. Shopify does not give apps the dollar list before purchase. Print label buys the cheapest available discounted label. FedEx is your preferred carrier in Admin, but Shopify’s app API cannot buy FedEx labels.</p>`;
+    }
+    toast("Shopify Shipping labels ready — price is set when you print");
+    return;
+  }
+  if (carrier === "ltl" || carrier === "other") {
+    return toast("LTL / Other: enter tracking and use Close carton & fulfill. No live rates.", "bad");
+  }
+  if (state.mode !== "live") {
+    carton.rates = demoRates(carrier, carton.weight);
+    const box = $("#rateBox");
+    if (box) box.innerHTML = renderRateBox(carton.rates);
+    toast(`${carton.rates.length} sample rates`);
+    return;
+  }
+  let url = "/api/fedex/rates";
+  let body = {};
+  if (carrier === "ups") {
+    const ups = upsSettings();
+    if (!ups.clientId || !ups.clientSecret || !ups.accountNumber) return toast("Add UPS Client ID, secret, and account in Settings", "bad");
+    url = "/api/ups/rates";
+    body = { ...ups, shipper: ups.shipper, recipient, weight: Number(carton.weight), dimensions: { l: carton.l, w: carton.w, h: carton.h } };
+  } else if (carrier === "usps" || carrier === "stamps") {
+    const stamps = stampsSettings();
+    if (!stamps.username || !stamps.password || !stamps.integrationId) return toast("Add Stamps.com username, password, and Integration ID in Settings", "bad");
+    url = "/api/stamps/rates";
+    body = { ...stamps, shipper: stamps.shipper, recipient, weight: Number(carton.weight), dimensions: { l: carton.l, w: carton.w, h: carton.h } };
+  } else {
+    const fx = fedexSettings();
+    if (!fx.useServerSandbox && (!fx.apiKey || !fx.secretKey || !fx.accountNumber)) return toast("Add FedEx keys in Settings", "bad");
+    url = "/api/fedex/rates";
+    body = { ...fx, shipper: fx.shipper, recipient, weight: Number(carton.weight), dimensions: { l: carton.l, w: carton.w, h: carton.h } };
+  }
+  $("#rateBox") && ($("#rateBox").innerHTML = `<p class="meta">Loading rates…</p>`);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Rate request failed");
+    carton.rates = data.rates || [];
+    const box = $("#rateBox");
+    if (box) box.innerHTML = renderRateBox(carton.rates);
+    toast(carton.rates.length ? `${carton.rates.length} rates` : "No rates");
+  } catch (err) {
+    const msg = /failed to fetch/i.test(err.message || "")
+      ? "Could not reach PackScan. Restart proxy.py and use http://localhost:8787"
+      : (err.message || "Rates failed");
+    toast(msg, "bad");
+    const box = $("#rateBox");
+    if (box) box.innerHTML = `<p class="meta">${msg}</p>`;
+  }
+}
+
+async function printFedexLabel(options = {}) {
+  const order = currentOrder();
+  if (!order) return false;
+  const carton = readCartonForm(order.id);
+  if (!carton.weight) {
+    toast("Enter carton weight first", "bad");
+    return false;
+  }
+  const shipper = fedexSettings().shipper;
+  const addr = order.shippingAddress || {};
+  const recipient = {
+    name: customerName(order),
+    company: addr.company || "",
+    phone: addr.phone || shipper.phone,
+    address1: addr.address1,
+    address2: addr.address2,
+    city: addr.city,
+    province: addr.provinceCode,
+    zip: addr.zip,
+    country: addr.countryCodeV2 || "US",
+  };
+  const carrier = useShopifyShipping() ? "shopify" : (carton.carrier || "fedex");
+  if (carrier === "shopify") {
+    if (state.mode !== "live") {
+      toast("Demo: Shopify Shipping label not purchased", "bad");
+      return false;
+    }
+    toast("Buying Shopify Shipping label…");
+    try {
+      const data = await ShopifyAPI.buyShopifyLabel(order, carton);
+      if (data.trackingNumber) {
+        carton.tracking = data.trackingNumber;
+        carton.carrier = "shopify";
+        const input = $("#cartonTracking");
+        if (input) input.value = data.trackingNumber;
+      }
+      if (data.labelUrl) window.open(data.labelUrl, "_blank");
+      toast(data.trackingNumber ? `Shopify label · ${data.trackingNumber}` : (data.status || "Label requested"));
+      return true;
+    } catch (err) {
+      toast(err.message || "Shopify Shipping label failed", "bad");
+      return false;
+    }
+  }
+  if (carrier === "ltl" || carrier === "other") {
+    toast("LTL / Other: type the tracking # then Close carton & fulfill. No label API.", "bad");
+    return false;
+  }
+  if (!shipper.address1 || !shipper.zip || !shipper.phone) {
+    toast("Fill ship-from street, ZIP, and phone in Settings", "bad");
+    return false;
+  }
+  let url = "/api/fedex/label";
+  let body = {};
+  const thermalEnabled = $("#fedexThermalInput")?.checked || localStorage.getItem("packscan_fedex_thermal") === "1";
+  if (carrier === "ups") {
+    const ups = upsSettings();
+    if (!ups.clientId || !ups.clientSecret || !ups.accountNumber) {
+      toast("Add UPS credentials in Settings", "bad");
+      return false;
+    }
+    url = "/api/ups/label";
+    body = { ...ups, shipper, recipient, weight: Number(carton.weight), dimensions: { l: carton.l, w: carton.w, h: carton.h }, serviceType: carton.service };
+  } else if (carrier === "usps" || carrier === "stamps") {
+    const stamps = stampsSettings();
+    if (!stamps.username || !stamps.password || !stamps.integrationId) {
+      toast("Add Stamps.com credentials in Settings", "bad");
+      return false;
+    }
+    url = "/api/stamps/label";
+    body = { ...stamps, shipper, recipient, weight: Number(carton.weight), dimensions: { l: carton.l, w: carton.w, h: carton.h }, serviceType: carton.service };
+  } else {
+    const fx = fedexSettings();
+    if (!fx.useServerSandbox && (!fx.apiKey || !fx.secretKey || !fx.accountNumber)) {
+      toast("Add FedEx credentials in Settings", "bad");
+      return false;
+    }
+    url = "/api/fedex/label";
+    body = {
+      ...fx, shipper, recipient,
+      weight: Number(carton.weight),
+      dimensions: { l: carton.l, w: carton.w, h: carton.h },
+      serviceType: serviceType(carton.service),
+      residential: carton.service === "FEDEX_HOME",
+      thermal: thermalEnabled,
+      labelStock: thermalEnabled ? "STOCK_4X6" : "PAPER_4X6",
+      imageType: thermalEnabled ? "ZPLII" : "PNG",
+    };
+  }
+  toast("Requesting " + carrier.toUpperCase() + " label…");
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const rawText = await res.text();
+    let data = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      throw new Error("Carrier server returned a web page, not JSON. Restart PackScan with python3 server.py or node server.mjs so /api/ups/label exists.");
+    }
+    if (!res.ok) {
+      const errs = data.details?.errors;
+      const fromList = Array.isArray(errs)
+        ? errs.map((e) => e.message || e.errorMessage || e.code).filter(Boolean).join("; ")
+        : "";
+      const detail = fromList || (data.error !== "FedEx shipment failed" && data.error) || JSON.stringify(data.details || data).slice(0, 400);
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    if (data.trackingNumber) {
+      carton.tracking = data.trackingNumber;
+      const input = $("#cartonTracking");
+      if (input) input.value = data.trackingNumber;
+    }
+    if (thermalEnabled && !data.labelZplBase64) {
+      throw new Error("FedEx returned no ZPLII label. Save Settings with the thermal-printer checkbox enabled and try again.");
+    }
+    if (data.labelZplBase64) {
+      try {
+        await sendZplToSelectedPrinter(data.labelZplBase64);
+        if (options.deferPackingSlip) {
+          printSlipForOrder(order).catch((err) => {
+            toast(`Label printed, but packing slip failed: ${err.message}`, "bad");
+          });
+        } else {
+          await printSlipForOrder(order);
+        }
+        toast(data.trackingNumber ? `Zebra label printed · ${data.trackingNumber}` : "Zebra label printed");
+      } catch (err) {
+        throw new Error(`ZPL label created but not printed: ${err.message}`);
+      }
+    } else if (data.labelPdfBase64) {
+      const mime = data.labelPdfBase64.startsWith("JVBER") ? "application/pdf" : "image/png";
+      printLabelAndSlip(data.labelPdfBase64, mime, order);
+    } else {
+      throw new Error("FedEx created the shipment but returned no label data");
+    }
+    recordLabelHistory(order, carrier, data);
+    toast(data.trackingNumber ? `Label ready · ${data.trackingNumber}` : "Label created");
+    return true;
+  } catch (err) {
+    toast(err.message || "FedEx label failed", "bad");
+    return false;
+  }
+}
+
+function bindEvents() {
+  $("#orderList").addEventListener("click", (e) => {
+    const card = e.target.closest(".order-card");
+    if (!card) return;
+    if (state.autoFill.enabled && state.autoFill.orderId !== card.dataset.id) {
+      state.autoFill.enabled = false;
+      state.autoFill.orderId = null;
+      state.autoFill.busy = false;
+      toast("Auto-fill turned off because you selected another order");
+    }
+    state.currentId = card.dataset.id;
+    renderAll();
+    $("#scanInput").focus();
+  });
+
+  $("#detail").addEventListener("change", (e) => {
+    if (e.target.id === "cartonBox") applySavedBox(e.target.value);
+    if (e.target.id === "cartonCarrier") {
+      const order = currentOrder();
+      if (!order) return;
+      const c = readCartonForm(order.id);
+      const services = servicesForCarrier(c.carrier);
+      c.service = services.includes(c.service) ? c.service : services[0];
+      c.rates = null;
+      const serviceSelect = $("#cartonService");
+      if (serviceSelect) serviceSelect.innerHTML = serviceOptionsHtml(c.carrier, c.service);
+      const rateBox = $("#rateBox");
+      if (rateBox) rateBox.innerHTML = renderRateBox(null);
+    }
+  });
+  $("#detail").addEventListener("click", (e) => {
+    if (e.target.id === "fulfillBtn") return fulfillCurrent();
+    if (e.target.id === "fulfillAllBtn") return fulfillEntireOrder();
+    if (e.target.id === "autoFillBtn") return toggleAutoFill();
+    if (e.target.classList.contains("fulfill-line")) return fulfillOneLine(e.target.dataset.line);
+    if (e.target.id === "rateBtn") return loadFedexRates();
+    if (e.target.closest(".rate-row")) return applyRate(e.target.closest(".rate-row"));
+    if (e.target.id === "printFedexBtn") return printFedexLabel();
+    if (e.target.id === "printSlip") return printSlip();
+    if (e.target.id === "unfillBtn") return unfillCurrent();
+    if (e.target.id === "cartonBox") return applySavedBox(e.target.value);
+    if (e.target.id === "clearOrderBtn" || e.target.id === "mobileBack") {
+      if (state.autoFill.enabled) {
+        state.autoFill.enabled = false;
+        state.autoFill.orderId = null;
+        state.autoFill.busy = false;
+      }
+      state.currentId = null;
+      if (e.target.id === "clearOrderBtn") {
+        $("#search").value = "";
+        state.search = "";
+      }
+      renderAll();
+      focusOrderSearch();
+      return;
+    }
+    const inc = e.target.closest(".inc");
+    const dec = e.target.closest(".dec");
+    const order = currentOrder();
+    if (!order || (!inc && !dec)) return;
+    const lineId = (inc || dec).dataset.line;
+    const line = order.fulfillmentOrders.flatMap((fo) => fo.lineItems).find((li) => li.id === lineId);
+    if (!line) return;
+    const next = pickCount(order.id, lineId) + (inc ? 1 : -1);
+    setPick(order.id, lineId, next, line.remaining);
+    renderAll();
+    if (inc) runAutoFillIfReady(order.id);
+  });
+
+  $("#packToggle")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".pack-btn");
+    if (!btn) return;
+    state.packMode = btn.dataset.pack || "EA";
+    localStorage.setItem("packscan_pack_mode", state.packMode);
+    renderPackToggle();
+    if (state.currentId) $("#scanInput")?.focus();
+    else focusOrderSearch();
+  });
+  $("#scanForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    if ($("#warnModal")?.classList.contains("open")) return hideNotOnOrder();
+    applyScan($("#scanInput").value);
+  });
+  $("#scanInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyScan(e.target.value);
+    }
+  });
+
+  let searchTimer = 0;
+  $("#search").addEventListener("input", (e) => {
+    state.search = e.target.value;
+    renderList();
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      if (document.activeElement === $("#search")) return;
+      selectOrderFromSearch(false);
+    }, 500);
+  });
+  $("#search").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const query = e.target.value.trim();
+    state.search = query;
+    if (!findOrderByCode(query) && state.orders.some((order) => remainingOf(order) > 0 && findMatchingLine(order, query))) {
+      e.target.value = "";
+      state.search = "";
+      renderList();
+      applyScan(query);
+      return;
+    }
+    renderList();
+    selectOrderFromSearch(true);
+  });
+  $("#scanStatus")?.addEventListener("click", () => {
+    if (state.currentId) $("#scanInput")?.focus();
+    else focusOrderSearch();
+  });
+  document.addEventListener("focusin", (e) => {
+    if (e.target === $("#scanInput")) {
+      setScanStatus("Scanner ready for item barcode");
+    } else if (e.target === $("#search")) {
+      setScanStatus(state.currentId
+        ? "Scanner is in Order Search - click here to return to item scanning"
+        : "Scanner ready for next order or item barcode");
+    }
+  });
+  $("#warnOk")?.addEventListener("click", hideNotOnOrder);
+  document.addEventListener("keydown", (e) => {
+    if ($("#warnModal")?.classList.contains("open")) {
+      e.preventDefault();
+      e.stopPropagation();
+      hideNotOnOrder();
+    }
+  }, true);
+  $$(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      state.filter = chip.dataset.filter;
+      $$(".chip").forEach((c) => c.classList.toggle("active", c === chip));
+      renderList();
+    });
+  });
+
+  $("#refreshBtn").addEventListener("click", loadOrders);
+  $("#settingsBtn").addEventListener("click", () => {
+    const s = ShopifyAPI.settings();
+    $("#fedexKeyInput").value = localStorage.getItem("packscan_fedex_key") || "";
+    $("#fedexSecretInput").value = localStorage.getItem("packscan_fedex_secret") || "";
+    $("#fedexAccountInput").value = localStorage.getItem("packscan_fedex_account") || "";
+    $("#fedexSandboxInput").checked = localStorage.getItem("packscan_fedex_sandbox") === "1";
+    $("#upsIdInput").value = localStorage.getItem("packscan_ups_id") || "";
+    $("#upsSecretInput").value = localStorage.getItem("packscan_ups_secret") || "";
+    $("#upsAccountInput").value = localStorage.getItem("packscan_ups_account") || "";
+    $("#upsSandboxInput").checked = localStorage.getItem("packscan_ups_sandbox") === "1";
+    $("#stampsUserInput").value = localStorage.getItem("packscan_stamps_user") || "";
+    $("#stampsPassInput").value = localStorage.getItem("packscan_stamps_pass") || "";
+    $("#stampsIdInput").value = localStorage.getItem("packscan_stamps_id") || "";
+    $("#stampsSandboxInput").checked = localStorage.getItem("packscan_stamps_sandbox") === "1";
+    fillPackDefaultFields();
+    fillBoxDefaultFields();
+    $("#fromNameInput").value = localStorage.getItem("packscan_from_name") || "";
+    $("#fromPhoneInput").value = localStorage.getItem("packscan_from_phone") || "";
+    $("#fromStreetInput").value = localStorage.getItem("packscan_from_street") || "";
+    $("#fromCityInput").value = localStorage.getItem("packscan_from_city") || "";
+    $("#fromStateInput").value = localStorage.getItem("packscan_from_state") || "";
+    $("#fromZipInput").value = localStorage.getItem("packscan_from_zip") || "";
+    $("#autoPrintInput").checked = localStorage.getItem("packscan_autoprint") !== "0";
+    $("#fedexThermalInput").checked = localStorage.getItem("packscan_fedex_thermal") === "1";
+    $("#labelRotUpsInput").value = localStorage.getItem("packscan_label_rot_ups") || "90";
+    $("#labelRotFedexInput").value = localStorage.getItem("packscan_label_rot_fedex") || "0";
+    $("#zebraPrinterInput").value = localStorage.getItem("packscan_zebra_printer") || "";
+    $("#shopifyShipInput").checked = useShopifyShipping();
+    applyShopifyShippingUi();
+    loadEnabledServices();
+    loadChannelToggles();
+    disableAutofill();
+    $("#notifyInput").checked = s.notify;
+    $("#soundInput").checked = state.sound;
+    $("#viewBarcodeInput").checked = localStorage.getItem("packscan_view_barcode") !== "0";
+    $("#viewPackingListInput").checked = localStorage.getItem("packscan_view_packing_list") !== "0";
+    $("#orderLimitInput").value = localStorage.getItem("packscan_order_limit") || "100";
+    $("#modeInput").value = state.mode;
+    $("#themeInput").value = localStorage.getItem("packscan_theme") || "default";
+    openModal("#settingsModal");
+  });
+  $("#aboutBtn").addEventListener("click", () => openModal("#aboutModal"));
+  $("#closeAbout").addEventListener("click", closeModals);
+  $("#historyBtn").addEventListener("click", () => {
+    openModal("#historyModal");
+    loadLabelHistory();
+  });
+  $("#closeHistory").addEventListener("click", closeModals);
+  $("#shopifyShipInput")?.addEventListener("change", () => {
+    localStorage.setItem("packscan_shopify_shipping", $("#shopifyShipInput").checked ? "1" : "0");
+    applyShopifyShippingUi();
+  });
+  $("#cameraBtn").addEventListener("click", startCamera);
+  $("#discoverZebraBtn").addEventListener("click", discoverZebraPrinters);
+  $("#testZebraBtn").addEventListener("click", async () => {
+    try {
+      await testZebraPrinter();
+      toast("Test ZPL sent to the Zebra printer");
+    } catch (err) {
+      toast(err.message || "Zebra test print failed", "bad");
+    }
+  });
+  $("#closeScan").addEventListener("click", async () => {
+    await stopCamera();
+    closeModals();
+  });
+  $("#closeSettings").addEventListener("click", closeModals);
+  $("#closeSettingsTop").addEventListener("click", closeModals);
+  $("#defaultsBtn")?.addEventListener("click", () => {
+    const panel = $("#defaultsPanel");
+    if (panel) panel.open = true;
+    panel?.scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#packC1Input")?.focus();
+  });
+  $("#boxesBtn")?.addEventListener("click", () => {
+    const panel = $("#boxesPanel");
+    if (panel) panel.open = true;
+    panel?.scrollIntoView({ behavior: "smooth", block: "center" });
+    $("#boxDefaultsList .box-name")?.focus();
+  });
+  $("#exportSettings").addEventListener("click", exportSettingsFile);
+  $("#importSettings").addEventListener("click", () => $("#importSettingsFile").click());
+  $("#importSettingsFile").addEventListener("change", importSettingsFile);
+  $("#cancelFulfillAll").addEventListener("click", closeModals);
+  $("#confirmFulfillAll").addEventListener("click", confirmFulfillAll);
+  $("#cancelAutoFill").addEventListener("click", closeModals);
+  $("#confirmAutoFill").addEventListener("click", startAutoFill);
+  $("#fulfillCarrier").addEventListener("change", () => {
+    const other = $("#fulfillCarrier").value === "Other";
+    $("#otherCarrierWrap").style.display = other ? "" : "none";
+    if (other) $("#fulfillCarrierOther").focus();
+  });
+  $("#themeInput")?.addEventListener("change", () => applyTheme($("#themeInput").value));
+  $("#saveSettings").addEventListener("click", async () => {
+    persistAllSettingsFields();
+    applyShopifyShippingUi();
+    renderPackToggle();
+    applyTheme($("#themeInput").value);
+    closeModals();
+    await loadOrders();
+  });
+  $("#testConn").addEventListener("click", async () => {
+    persistShopifyFields();
+    try {
+      const shop = await ShopifyAPI.testConnection();
+      toast(`Connected to ${shop.name}`);
+    } catch (err) {
+      toast(err.message, "bad");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "F10") {
+      e.preventDefault();
+      $("#printFedexBtn")?.click();
+      return;
+    }
+    if (e.key === "F8") {
+      e.preventDefault();
+      $("#fulfillBtn")?.click();
+      return;
+    }
+    if (e.key === "Escape") {
+      stopCamera();
+      closeModals();
+    }
+  });
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  SHOPIFY_SENSITIVE_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+  const oauthReady = ShopifyAPI.configured();
+  if (window.PACKSCAN_HOSTED && !oauthReady) {
+    localStorage.setItem("packscan_mode", "demo");
+    state.mode = "demo";
+  } else if (oauthReady) {
+    localStorage.setItem("packscan_mode", "live");
+    state.mode = "live";
+  }
+  bindEvents();
+  if (window.PACKSCAN_HOSTED && !window.PACKSCAN_SHOP) {
+    const box = document.getElementById("detail");
+    if (box) {
+      box.innerHTML = `<section class="empty"><h2>Install PackScan</h2>
+        <p class="meta">Enter your Shopify shop domain to install PackScan.</p>
+        <form id="installForm" style="display:flex;gap:8px;margin-top:12px">
+          <input id="installShop" placeholder="your-store.myshopify.com" style="flex:1" autocomplete="off" />
+          <button class="primary-btn" type="submit">Install</button>
+        </form></section>`;
+      document.getElementById("installForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const shop = document.getElementById("installShop").value.trim();
+        if (shop) location.href = "/auth?shop=" + encodeURIComponent(shop);
+      });
+    }
+  }
+  const needsInstall = window.PACKSCAN_HOSTED && !window.PACKSCAN_SHOP;
+  if (!needsInstall) loadOrders();
+  const mobile = window.matchMedia("(max-width: 860px)").matches || /Mobi|Android/i.test(navigator.userAgent);
+  setTimeout(() => {
+    if (state.currentId) $("#scanInput")?.focus();
+    else focusOrderSearch();
+  }, 200);
+});
+
+  </script>
+</body>
+</html>

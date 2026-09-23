@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: packscan
+    runtime: python
+    plan: starter
+    buildCommand: "true"
+    startCommand: python server.py
+    envVars:
+      - key: HOST
+        sync: false
+      - key: SHOPIFY_API_KEY
+        sync: false
+      - key: SHOPIFY_API_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: PACKSCAN_ENV
+        value: production
+      - key: BIND
+        value: 0.0.0.0

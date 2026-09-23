@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PackScan - Tradeshow Orders</title>
+  <link rel="stylesheet" href="css/app.css" />
+  <style>
+    .trade-app { max-width: 1180px; margin: 0 auto; padding: 18px; }
+    .trade-top, .trade-actions, .trade-grid { display: flex; gap: 12px; }
+    .trade-top { align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .trade-grid { align-items: flex-start; }
+    .trade-panel { flex: 1; min-width: 0; }
+    .trade-panel h2 { margin-top: 0; }
+    .trade-list { display: grid; gap: 8px; margin-top: 12px; }
+    .trade-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid #293746; border-radius: 8px; background: #121a22; }
+    .trade-row button { min-width: 38px; }
+    .trade-total { display: flex; justify-content: space-between; margin-top: 14px; font-weight: 700; }
+    .trade-note { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .trade-form { display: grid; gap: 10px; }
+    .trade-form input, .trade-form textarea { width: 100%; box-sizing: border-box; }
+    .trade-status { min-height: 20px; color: var(--accent); margin-top: 10px; }
+    @media (max-width: 760px) { .trade-grid { flex-direction: column; } .trade-panel { width: 100%; } }
+  </style>
+</head>
+<body>
+  <div class="trade-app">
+    <header class="trade-top">
+      <div class="brand"><img class="logo-img" src="logo.png" alt="PackScan" width="40" height="40" /> PackScan</div>
+      <div class="trade-actions">
+        <a class="ghost-btn" href="/">Pick &amp; Pack</a>
+        <button class="ghost-btn" id="newOrderBtn" type="button">New Order</button>
+      </div>
+    </header>
+    <h1>Tradeshow Order Entry</h1>
+    <p class="trade-note">Scan displayed product barcodes, capture a business card, and prepare a Shopify draft order. This prototype uses demo products and does not write to Shopify.</p>
+    <div class="trade-grid">
+      <section class="trade-panel">
+        <h2>Scan Products</h2>
+        <form class="scan-bar" id="productScanForm" autocomplete="off">
+          <input id="productScanInput" placeholder="Scan product barcode or SKU" autocomplete="off" />
+          <button class="primary-btn" type="submit">Add Item</button>
+        </form>
+        <div class="trade-list" id="productList"></div>
+      </section>
+      <section class="trade-panel">
+        <h2>Customer</h2>
+        <button class="primary-btn" id="cardScanBtn" type="button">Scan Business Card</button>
+        <p class="trade-note">On iPhone, this will use on-device OCR. Email is the only customer lookup field; all customer details remain editable.</p>
+        <form class="trade-form" id="customerForm" autocomplete="off">
+          <input id="customerName" placeholder="Full name" autocomplete="off" />
+          <input id="customerCompany" placeholder="Company" autocomplete="off" />
+          <input id="customerEmail" type="email" placeholder="Email (lookup key)" autocomplete="off" required />
+          <input id="customerPhone" placeholder="Phone" autocomplete="off" />
+          <textarea id="customerAddress" rows="3" placeholder="Shipping address" autocomplete="off"></textarea>
+          <div class="trade-actions">
+            <button class="primary-btn" type="submit">Lookup by Email</button>
+            <button class="ghost-btn" id="saveCustomerBtn" type="button" disabled>Save Customer Changes</button>
+          </div>
+        </form>
+        <div class="trade-status" id="customerStatus"></div>
+      </section>
+    </div>
+    <section class="trade-panel" style="margin-top:18px">
+      <h2>Draft Order</h2>
+      <div id="draftSummary" class="trade-note">Add products to begin.</div>
+      <div class="trade-total"><span>Total</span><span id="draftTotal">$0.00</span></div>
+      <button class="ok-btn" id="createDraftBtn" type="button" disabled style="margin-top:14px">Create Draft Order</button>
+      <div class="trade-status" id="orderStatus"></div>
+    </section>
+  </div>
+  <script>
+    const products = [
+      { barcode: "012345678901", sku: "BG-TEE-BLK-L", title: "Big's Classic Tee - Black / L", price: 28 },
+      { barcode: "012345678932", sku: "BG-HOOD-GRY-M", title: "Big's Hoodie - Grey / M", price: 58 },
+      { barcode: "012345678949", sku: "BG-KTEE-RED-YM", title: "Kids Tee - Red / Youth M", price: 22 },
+      { barcode: "012345678925", sku: "BG-PINT-01", title: "Pint Glass - Logo", price: 14 }
+    ];
+    const demoCustomers = {
+      "alex@example.com": { name: "Alex Example", company: "Example Co.", email: "alex@example.com", phone: "555-0100", address: "123 Demo Lane, Testville, CA 90000" }
+    };
+    const state = { cart: {}, customer: null };
+    const $ = (id) => document.getElementById(id);
+    function render() {
+      const rows = Object.values(state.cart);
+      $("productList").innerHTML = rows.length ? rows.map((item) => `
+        <div class="trade-row">
+          <div><strong>${item.title}</strong><div class="trade-note">${item.sku} - $${item.price.toFixed(2)} each</div></div>
+          <div class="trade-actions"><button class="ghost-btn" data-remove="${item.sku}" type="button">-</button><b>${item.quantity}</b><button class="ghost-btn" data-add="${item.sku}" type="button">+</button></div>
+        </div>`).join("") : '<p class="trade-note">No products scanned yet.</p>';
+      const total = rows.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      $("draftSummary").textContent = rows.length ? `${rows.reduce((sum, item) => sum + item.quantity, 0)} item(s) ready for ${state.customer?.name || "a customer"}.` : "Add products to begin.";
+      $("draftTotal").textContent = `$${total.toFixed(2)}`;
+      $("createDraftBtn").disabled = !rows.length || !state.customer;
+    }
+    function addProduct(code) {
+      const product = products.find((item) => item.barcode === code || item.sku.toLowerCase() === code.toLowerCase());
+      if (!product) return $("orderStatus").textContent = `Product not found: ${code}`;
+      state.cart[product.sku] = { ...product, quantity: (state.cart[product.sku]?.quantity || 0) + 1 };
+      $("productScanInput").value = "";
+      $("orderStatus").textContent = `${product.title} added.`;
+      render();
+    }
+    $("productScanForm").addEventListener("submit", (event) => { event.preventDefault(); addProduct($("productScanInput").value.trim()); });
+    $("productList").addEventListener("click", (event) => {
+      const add = event.target.closest("[data-add]");
+      const remove = event.target.closest("[data-remove]");
+      const sku = add?.dataset.add || remove?.dataset.remove;
+      if (!sku) return;
+      if (add) state.cart[sku].quantity += 1;
+      if (remove) { state.cart[sku].quantity -= 1; if (state.cart[sku].quantity <= 0) delete state.cart[sku]; }
+      render();
+    });
+    $("cardScanBtn").addEventListener("click", () => $("customerStatus").textContent = "Business-card OCR will be enabled in the iPhone build. Enter or paste the card details below for now.");
+    $("customerForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const email = $("customerEmail").value.trim();
+      if (!email) return $("customerStatus").textContent = "Email is required for customer lookup.";
+      const existing = demoCustomers[email.toLowerCase()];
+      if (existing) {
+        $("customerName").value = existing.name;
+        $("customerCompany").value = existing.company;
+        $("customerPhone").value = existing.phone;
+        $("customerAddress").value = existing.address;
+        $("customerStatus").textContent = `Customer found by email: ${existing.name}. Review and modify the details, then save.`;
+      } else {
+        $("customerStatus").textContent = "No customer found by that email. Enter the customer details, then save.";
+      }
+      $("saveCustomerBtn").disabled = false;
+      state.customer = null;
+      render();
+    });
+    $("saveCustomerBtn").addEventListener("click", () => {
+      const email = $("customerEmail").value.trim();
+      const name = $("customerName").value.trim();
+      if (!email || !name) return $("customerStatus").textContent = "Name and email are required before saving.";
+      state.customer = {
+        name,
+        company: $("customerCompany").value.trim(),
+        email,
+        phone: $("customerPhone").value.trim(),
+        address: $("customerAddress").value.trim()
+      };
+      demoCustomers[email.toLowerCase()] = { ...state.customer };
+      $("customerStatus").textContent = `Customer details saved for ${name} (${email}).`;
+      render();
+    });
+    $("createDraftBtn").addEventListener("click", () => $("orderStatus").textContent = "Demo draft order ready. Shopify creation will be connected next.");
+    $("newOrderBtn").addEventListener("click", () => { state.cart = {}; state.customer = null; document.querySelectorAll("input, textarea").forEach((field) => { field.value = ""; }); $("saveCustomerBtn").disabled = true; $("customerStatus").textContent = ""; $("orderStatus").textContent = ""; render(); });
+    render();
+  </script>
+</body>
+</html>

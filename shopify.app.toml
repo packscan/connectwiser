@@ -1,0 +1,16 @@
+# PackScan app config for Shopify CLI (`shopify app deploy`).
+# Replace the host with your Render URL before deploying.
+
+name = "PackScan"
+client_id = ""
+
+[webhooks]
+api_version = "2026-07"
+
+[[webhooks.subscriptions]]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "/webhooks"
+
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
