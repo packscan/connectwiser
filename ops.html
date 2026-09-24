@@ -362,6 +362,9 @@ const renderInvoices = invoices => {
 	if (!invoiceList) return;
 	invoiceList.innerHTML = invoices.map(invoice => `<div class="billing-row saved-invoice"><span class="company-logo coral-bg">$</span><span><b>${invoice.company} - ${invoice.title}</b><small>${invoice.status} · Invoice ${invoice.id}</small></span><strong>${Number(invoice.amount).toLocaleString('en-US',{style:'currency',currency:'USD'})}</strong></div>`).join('');
 };
+if (workflowState.invoiceCreated && workflowState.title) {
+	renderInvoices([{id:'local-'+(workflowState.ticketId || 'invoice'), title:workflowState.title, company:workflowState.company || 'Connected company', amount:workflowState.amount || 1250, status:'Created locally'}]);
+}
 const loadInvoices = () => {
 	if (!window.PACKSCAN_HOSTED || !window.PACKSCAN_SHOP) return;
 	fetch('/api/connectwiser/invoices').then(response => response.ok ? response.json() : null).then(data => {
@@ -393,6 +396,7 @@ const createInvoice = async () => {
 		} else {
 			workflowState.invoiceCreated = true;
 			saveWorkflow();
+			renderInvoices([{id:'local-'+(workflowState.ticketId || 'invoice'), title:payload.title, company:payload.company, amount:payload.amount, status:'Created locally'}]);
 		}
 		button.textContent = 'Invoice created';
 		auditToast('Invoice saved');
