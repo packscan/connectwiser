@@ -84,7 +84,7 @@ if (workflowState.title) {
 	document.getElementById('quoteTicket').textContent = `from ticket ${workflowState.ticketId || ''}`;
 	document.getElementById('billingTitle').textContent = `${workflowState.company || ''} - ${workflowState.title}`;
 }
-if (workflowState.invoiceCreated) {
+if (workflowState.invoiceCreated && (!window.PACKSCAN_HOSTED || window.PACKSCAN_SHOP)) {
 	const invoiceButton = document.getElementById('createInvoiceBtn');
 	invoiceButton.textContent = 'Invoice created';
 	invoiceButton.disabled = true;
@@ -378,6 +378,8 @@ document.getElementById('createInvoiceBtn').onclick = async () => {
 			const result = await response.json();
 			if (!response.ok) throw new Error(result.error || 'Invoice could not be saved');
 			renderInvoices([result.invoice]);
+		} else if (window.PACKSCAN_HOSTED && !window.PACKSCAN_SHOP) {
+			throw new Error('Connect your commerce account before creating an invoice');
 		} else {
 			workflowState.invoiceCreated = true;
 			saveWorkflow();
