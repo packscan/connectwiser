@@ -121,6 +121,8 @@ document.getElementById('createInvoiceBtn').addEventListener('click', () => {
 });
 document.getElementById('newQuoteBtn').addEventListener('click', () => {
 	showView('quotes');
+	workflowState.invoiceCreated = false;
+	saveWorkflow();
 	document.getElementById('quoteTitle').textContent = 'New service quote';
 	document.getElementById('quoteCompany').textContent = 'Select a company';
 	document.getElementById('quoteTicket').textContent = 'not linked to a ticket';
@@ -179,6 +181,7 @@ document.getElementById('createQuoteBtn').onclick = event => {
 	document.getElementById('quoteTicket').textContent = `from ticket ${ticket.id}`;
 	document.getElementById('billingTitle').textContent = `${ticket.company} - ${ticket.title}`;
 	if (typeof workflowState !== 'undefined') {
+		workflowState.invoiceCreated = false;
 		workflowState.title = ticket.title;
 		workflowState.company = ticket.company;
 		workflowState.ticketId = ticket.id;
@@ -249,7 +252,14 @@ const openBillingReview = () => {
 			queue.prepend(reviewPanel);
 		}
 		document.getElementById('billingReviewSummary').textContent = `${document.getElementById('billingTitle').textContent} · ${document.getElementById('billingAmount').textContent}`;
-		document.getElementById('billingReviewCreate').onclick = () => document.getElementById('createInvoiceBtn').click();
+		document.getElementById('billingReviewCreate').onclick = () => {
+			const invoiceButton = document.getElementById('createInvoiceBtn');
+			if (invoiceButton.disabled) {
+				auditToast('This invoice has already been created');
+				return;
+			}
+			invoiceButton.click();
+		};
 		requestAnimationFrame(() => queue.scrollIntoView({behavior:'smooth', block:'center'}));
 	}
 	auditToast('Invoice review opened');
