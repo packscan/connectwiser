@@ -252,14 +252,7 @@ const openBillingReview = () => {
 			queue.prepend(reviewPanel);
 		}
 		document.getElementById('billingReviewSummary').textContent = `${document.getElementById('billingTitle').textContent} · ${document.getElementById('billingAmount').textContent}`;
-		document.getElementById('billingReviewCreate').onclick = () => {
-			const invoiceButton = document.getElementById('createInvoiceBtn');
-			if (invoiceButton.disabled) {
-				auditToast('This invoice has already been created');
-				return;
-			}
-			invoiceButton.click();
-		};
+		document.getElementById('billingReviewCreate').onclick = createInvoice;
 		requestAnimationFrame(() => queue.scrollIntoView({behavior:'smooth', block:'center'}));
 	}
 	auditToast('Invoice review opened');
@@ -376,8 +369,12 @@ const loadInvoices = () => {
 	}).catch(() => {});
 };
 loadInvoices();
-document.getElementById('createInvoiceBtn').onclick = async () => {
+const createInvoice = async () => {
 	const button = document.getElementById('createInvoiceBtn');
+	if (button.disabled) {
+		auditToast('This invoice has already been created');
+		return;
+	}
 	const amountText = document.getElementById('quoteTotal').textContent.replace(/[$,]/g, '');
 	const payload = {title: workflowState.title || document.getElementById('quoteTitle').textContent, company: workflowState.company || document.getElementById('quoteCompany').textContent, amount: Number(workflowState.amount || amountText)};
 	button.disabled = true;
@@ -402,4 +399,5 @@ document.getElementById('createInvoiceBtn').onclick = async () => {
 		auditToast(error.message);
 	}
 };
+document.getElementById('createInvoiceBtn').onclick = createInvoice;
 </script></body></html>
