@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: packscan
+    name: connectwiser
     runtime: python
+    # ConnectWiser is developed and owned by PackScan.
     plan: starter
-    buildCommand: "true"
+    buildCommand: "pip install -r requirements.txt"
     startCommand: python server.py
     envVars:
       - key: HOST
@@ -14,7 +15,25 @@ services:
         sync: false
       - key: SESSION_SECRET
         sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: connectwiser-db
+          property: connectionString
+      - key: SHOPIFY_BILLING_ENABLED
+        value: "0"
+      - key: SHOPIFY_PLAN_NAME
+        value: Pro
+      - key: SHOPIFY_PLAN_PRICE
+        value: "79.99"
+      - key: SHOPIFY_PLAN_TRIAL_DAYS
+        value: "14"
       - key: PACKSCAN_ENV
         value: production
       - key: BIND
         value: 0.0.0.0
+
+databases:
+  - name: connectwiser-db
+    databaseName: connectwiser
+    user: connectwiser
+    plan: basic-256mb

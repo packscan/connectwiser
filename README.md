@@ -1,3 +1,30 @@
+# PackScan and ConnectWiser
+
+ConnectWiser is a PackScan product. PackScan is the developer and owner of ConnectWiser.
+
+ConnectWiser is the service-operations workspace at `/ops`. It covers the workflow from ticket intake to quote approval and invoice creation. The workspace currently uses local demo data so the product flow can be tested on Render without exposing customer records.
+
+## ConnectWiser on Render
+
+1. Push this repository to GitHub and create a Render Blueprint from it.
+2. Render provisions the `connectwiser` web service and a managed PostgreSQL database named `connectwiser-db`.
+3. Render injects the database connection string as `DATABASE_URL`; the server creates its tables on first startup.
+4. Set `HOST`, `SESSION_SECRET`, and Shopify credentials in Render. Open `https://YOUR-HOST/ops` to use the operations workspace.
+
+### Git and Render deployment
+
+The repository is already configured with the `origin` remote on the `main` branch. From the project folder:
+
+```powershell
+git add .
+git commit -m "Set up ConnectWiser operations workspace"
+git push origin main
+```
+
+In Render, choose **New > Blueprint**, select the repository, and apply `render.yaml`. Do not commit `.env`, session secrets, API credentials, or local shop data; `.gitignore` excludes them.
+
+The existing PackScan Shopify app remains available at `/`. Shopify credentials and the `HOST` / `SESSION_SECRET` values remain required only for the Shopify-connected PackScan flow.
+
 # PackScan — hosted Shopify app
 
 Same pick/pack station, installed from Shopify Admin. Merchants do not paste Client secrets. You host one server; each shop gets an OAuth token stored on the server.
@@ -28,6 +55,11 @@ Carrier keys (FedEx / UPS / USPS) still stay in the merchant’s browser Setting
    | `SHOPIFY_API_SECRET` | Client secret |
    | `SESSION_SECRET` | unique high-entropy session-signing value |
    | `SESSION_TTL_SECONDS` | optional session lifetime in seconds (default: 2592000 = 30 days) |
+   | `DATABASE_URL` | Render Postgres connection string; required for persistent production shop tokens |
+   | `SHOPIFY_BILLING_ENABLED` | `1` after the Shopify plan is configured; leave `0` during development |
+   | `SHOPIFY_PLAN_NAME` | Shopify plan display name, for example `Pro` |
+   | `SHOPIFY_PLAN_PRICE` | Monthly USD price, for example `79.99` |
+   | `SHOPIFY_PLAN_TRIAL_DAYS` | Trial length, for example `14` |
    | `PACKSCAN_ENV` | `production` |
    | `BIND` | `0.0.0.0` |
 
@@ -85,7 +117,9 @@ Keep using the local zip in the warehouse if you want. Hosted is the public vers
 
 ## 5. Data
 
-Installed shop tokens are stored in `data/shops.json` on the server. Compliance logs are also stored under `data/`. The server only serves an allowlist of application HTML, CSS, and logo assets, so neither directory is web-accessible. On Render’s free/starter disk these files can reset on redeploy — use a persistent disk or later swap in Postgres. Treat the directory as secret.
+Installed shop tokens use Render Postgres when `DATABASE_URL` is configured, with `data/shops.json` as a local-development fallback. Compliance logs are also stored under `data/`. The server only serves an allowlist of application HTML, CSS, and logo assets, so neither directory is web-accessible. Configure Render Postgres before production launch so redeploys do not disconnect merchants.
+
+When `SHOPIFY_BILLING_ENABLED=1`, a new OAuth installation is sent to Shopify's subscription approval page before returning to PackScan. The subscription amount and trial must match the public plan configured in the Partner Dashboard.
 
 ## Local test of the hosted server
 

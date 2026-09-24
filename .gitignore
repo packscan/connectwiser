@@ -1,0 +1,19 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Python generated files
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local runtime data
+/data/shops.json
+/data/shops.json.tmp
+/data/compliance.json
+/data/compliance.json.tmp
+
+# Local media and temporary exports
+/temp_frames/
+*.log

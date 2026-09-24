@@ -22,6 +22,14 @@ SHOP_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
 HOST = (os.environ.get("HOST") or os.environ.get("APP_URL") or "").rstrip("/")
 API_KEY = os.environ.get("SHOPIFY_API_KEY") or os.environ.get("SHOPIFY_CLIENT_ID") or ""
 API_SECRET = os.environ.get("SHOPIFY_API_SECRET") or os.environ.get("SHOPIFY_CLIENT_SECRET") or ""
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+SHOPIFY_BILLING_ENABLED = os.environ.get("SHOPIFY_BILLING_ENABLED", "0").strip() == "1"
+SHOPIFY_PLAN_NAME = os.environ.get("SHOPIFY_PLAN_NAME", "Pro").strip()
+SHOPIFY_PLAN_PRICE = os.environ.get("SHOPIFY_PLAN_PRICE", "79.99").strip()
+try:
+    SHOPIFY_PLAN_TRIAL_DAYS = max(0, int(os.environ.get("SHOPIFY_PLAN_TRIAL_DAYS", "14")))
+except ValueError:
+    SHOPIFY_PLAN_TRIAL_DAYS = 14
 SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
     "read_orders,write_orders,read_products,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,write_fulfillments",
@@ -48,14 +56,36 @@ OAUTH_STATES_LOCK = threading.Lock()
 STATIC_ASSETS = {
     "/": "index.html",
     "/index.html": "index.html",
+    "/ops": "ops.html",
+    "/ops.html": "ops.html",
     "/privacy": "privacy.html",
     "/privacy.html": "privacy.html",
     "/css/app.css": os.path.join("css", "app.css"),
+    "/css/ops.css": os.path.join("css", "ops.css"),
     "/logo.png": "logo.png",
 }
 
 
 def load_shops():
+    if DATABASE_URL:
+        try:
+            import psycopg
+            with psycopg.connect(DATABASE_URL) as conn:
+                conn.execute("CREATE TABLE IF NOT EXISTS packscan_shops (shop TEXT PRIMARY KEY, data JSONB NOT NULL)")
+                rows = conn.execute("SELECT shop, data FROM packscan_shops").fetchall()
+            if rows:
+                return {shop: data for shop, data in rows}
+            try:
+                with open(SHOPS_PATH, "r", encoding="utf-8") as f:
+                    legacy = json.load(f)
+                if isinstance(legacy, dict) and legacy:
+                    save_shops(legacy)
+                    return legacy
+            except Exception:
+                pass
+            return {}
+        except Exception as exc:
+            print("DATABASE LOAD FAILED", exc)
     try:
         with open(SHOPS_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -64,6 +94,20 @@ def load_shops():
 
 
 def save_shops(data):
+    if DATABASE_URL:
+        try:
+            import psycopg
+            with psycopg.connect(DATABASE_URL) as conn:
+                conn.execute("CREATE TABLE IF NOT EXISTS packscan_shops (shop TEXT PRIMARY KEY, data JSONB NOT NULL)")
+                conn.execute("DELETE FROM packscan_shops")
+                for shop, record in data.items():
+                    conn.execute(
+                        "INSERT INTO packscan_shops (shop, data) VALUES (%s, %s) ON CONFLICT (shop) DO UPDATE SET data = EXCLUDED.data",
+                        (shop, json.dumps(record)),
+                    )
+            return
+        except Exception as exc:
+            print("DATABASE SAVE FAILED", exc)
     os.makedirs(os.path.dirname(SHOPS_PATH), exist_ok=True)
     tmp = SHOPS_PATH + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -181,7 +225,7 @@ def verify_shopify_launch(qs, now=None):
     current_time = int(time.time() if now is None else now)
     if abs(current_time - requested_at) > SHOPIFY_LAUNCH_TTL_SECONDS:
         return None
-    return shop if shop in load_shops() else None
+    return shop
 
 
 def create_oauth_state(shop, browser):
@@ -304,6 +348,54 @@ def exchange_oauth_code(shop, code):
         raise RuntimeError("OAuth exchange failed")
     store_shop_tokens(shop, data)
     return token
+
+
+def billing_confirmation_url(handler, shop, token):
+    if not SHOPIFY_BILLING_ENABLED:
+        return None
+    query = """
+      query {
+        currentAppInstallation {
+          activeSubscriptions { id name status }
+        }
+      }
+    """
+    status, raw = handler._admin(shop, token, {"query": query})
+    if status >= 400:
+        raise RuntimeError("Shopify billing status check failed")
+    payload = json.loads(raw.decode("utf-8"))
+    if payload.get("errors"):
+        raise RuntimeError(payload["errors"][0].get("message") or "Shopify billing status check failed")
+    active = (payload.get("data") or {}).get("currentAppInstallation", {}).get("activeSubscriptions") or []
+    if any(str(item.get("status", "")).upper() in ("ACTIVE", "PENDING") for item in active):
+        return None
+    mutation = """
+      mutation CreatePackScanSubscription($name: String!, $lineItems: [AppSubscriptionLineItemInput!]!, $returnUrl: URL!, $trialDays: Int, $test: Boolean) {
+        appSubscriptionCreate(name: $name, lineItems: $lineItems, returnUrl: $returnUrl, trialDays: $trialDays, test: $test) {
+          confirmationUrl
+          userErrors { field message }
+        }
+      }
+    """
+    variables = {
+        "name": SHOPIFY_PLAN_NAME,
+        "returnUrl": HOST + "/billing/return",
+        "trialDays": SHOPIFY_PLAN_TRIAL_DAYS,
+        "test": ENVIRONMENT != "production",
+        "lineItems": [{"plan": {"appRecurringPricingDetails": {
+            "price": {"amount": SHOPIFY_PLAN_PRICE, "currencyCode": "USD"},
+            "interval": "EVERY_30_DAYS",
+        }}}],
+    }
+    status, raw = handler._admin(shop, token, {"query": mutation, "variables": variables})
+    if status >= 400:
+        raise RuntimeError("Shopify billing subscription creation failed")
+    payload = json.loads(raw.decode("utf-8"))
+    result = (payload.get("data") or {}).get("appSubscriptionCreate") or {}
+    errors = result.get("userErrors") or []
+    if errors:
+        raise RuntimeError("; ".join(error.get("message", "Billing error") for error in errors))
+    return result.get("confirmationUrl")
 
 
 LABEL_HISTORY_PATH = os.path.join(ROOT, "data", "label_history.json")
@@ -457,13 +549,18 @@ class Handler(SimpleHTTPRequestHandler):
         qs = parsed.query
         params = urllib.parse.parse_qs(qs)
 
-        if path == "/api/health":
+        if path in ("/health", "/api/health"):
             return self._json(200, {"ok": True, "server": "python", "hosted": HOSTED, "ups": True, "fedex": True, "stamps": True})
 
         if path in ("/", "/index.html") and params.get("hmac"):
             shop = verify_shopify_launch(qs)
             if not shop:
                 return self._json(401, {"error": "Invalid or expired Shopify app launch"})
+            if shop not in load_shops():
+                self.send_response(302)
+                self.send_header("Location", "/auth?shop=" + urllib.parse.quote(shop, safe=""))
+                self.end_headers()
+                return
             expires_at = int(time.time()) + SESSION_TTL_SECONDS
             self.send_response(302)
             self.send_header("Set-Cookie", self._cookie_value("packscan_session", sign_session(shop, expires_at), SESSION_TTL_SECONDS))
@@ -517,13 +614,20 @@ class Handler(SimpleHTTPRequestHandler):
             if not consume_oauth_state(state, shop, browser):
                 return self._json(401, {"error": "Invalid or expired OAuth state"})
             try:
-                exchange_oauth_code(shop, code)
+                token = exchange_oauth_code(shop, code)
             except Exception as e:
                 return self._json(401, {"error": str(e)})
             expires_at = int(time.time()) + SESSION_TTL_SECONDS
             cookie = self._cookie_value("packscan_session", sign_session(shop, expires_at), SESSION_TTL_SECONDS)
+            billing_url = billing_confirmation_url(self, shop, token)
             self.send_response(302)
             self.send_header("Set-Cookie", cookie)
+            self.send_header("Location", billing_url or "/")
+            self.end_headers()
+            return
+
+        if path == "/billing/return":
+            self.send_response(302)
             self.send_header("Location", "/")
             self.end_headers()
             return
@@ -563,6 +667,8 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path == "/webhooks" or path.startswith("/webhooks/"):
             return self._compliance_webhook(path)
+        if path == "/api/connectwiser/quote":
+            return self._connectwiser_quote()
         if path == "/api/fedex/label":
             return self._fedex_label()
         if path == "/api/fedex/rates":
@@ -611,6 +717,60 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(data)
         except Exception as e:
             self._json(500, {"error": str(e)})
+
+    def _connectwiser_quote(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+        try:
+            payload = json.loads(raw or "{}")
+        except json.JSONDecodeError:
+            return self._json(400, {"error": "Invalid JSON"})
+        if not isinstance(payload, dict):
+            return self._json(400, {"error": "Quote payload must be an object"})
+
+        title = str(payload.get("title") or "ConnectWiser service quote").strip()[:255]
+        company = str(payload.get("company") or "").strip()[:255]
+        description = str(payload.get("description") or "").strip()[:1000]
+        try:
+            amount = round(float(payload.get("amount", 0)), 2)
+        except (TypeError, ValueError):
+            return self._json(400, {"error": "Quote amount must be a number"})
+        if amount <= 0:
+            return self._json(400, {"error": "Quote amount must be greater than zero"})
+
+        shop = read_session(self.headers.get("Cookie"))
+        token = shop_access_token(shop) if shop else None
+        if not shop or not token:
+            return self._json(401, {"error": "Connect a commerce account before creating a live quote"})
+
+        mutation = """
+        mutation ConnectWiserDraftOrder($input: DraftOrderInput!) {
+          draftOrderCreate(input: $input) {
+            draftOrder { id name status invoiceUrl totalPriceSet { shopMoney { amount currencyCode } } }
+            userErrors { field message }
+          }
+        }
+        """
+        variables = {
+            "input": {
+                "lineItems": [{"title": title, "quantity": 1, "originalUnitPrice": str(amount)}],
+                "note": description or ("ConnectWiser quote for " + company if company else "ConnectWiser quote"),
+                "tags": ["ConnectWiser", "Quote"],
+            }
+        }
+        try:
+            status, data = self._admin(shop, token, {"query": mutation, "variables": variables})
+            parsed = json.loads(data.decode("utf-8", "replace"))
+            errors = parsed.get("errors") or parsed.get("data", {}).get("draftOrderCreate", {}).get("userErrors", [])
+            if errors:
+                message = "; ".join(item.get("message", "Shopify quote failed") for item in errors)
+                return self._json(502 if status < 400 else status, {"error": message})
+            draft = parsed.get("data", {}).get("draftOrderCreate", {}).get("draftOrder")
+            if not draft:
+                return self._json(502, {"error": "Shopify did not return a draft order"})
+            return self._json(201, {"quote": draft, "provider": "shopify"})
+        except Exception as exc:
+            return self._json(502, {"error": "Shopify quote creation failed", "details": str(exc)})
 
     def _admin(self, shop, token, payload):
         body = json.dumps({"query": payload["query"], "variables": payload.get("variables") or {}}).encode()

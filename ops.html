@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101923">
+<title>ConnectWiser by PackScan | Service workspace</title>
+<meta name="author" content="PackScan">
+<meta name="description" content="ConnectWiser, a service operations workspace developed and owned by PackScan.">
+<style>.product-credit{color:#82909a;font-size:10px;line-height:1.4;margin:-25px 10px 25px}.product-credit b{color:#cbd6dc}.product-footer{color:#9aa4a8;font-size:11px;text-align:center;padding:28px 0 0}.product-footer b{color:#18222d}</style>
+<script src="/config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/ops.css">
+</head>
+<body><div class="shell">
+<aside class="nav" id="nav"><div class="mark"><span class="mark-glyph">C</span><span>connectwiser</span></div><p class="product-credit">Developed and owned by <b>PackScan</b></p><div class="workspace"><span class="workspace-dot"></span><span><b>Acme IT Services</b><small>Operations workspace</small></span><span class="chevron">v</span></div>
+<nav aria-label="Main navigation"><p class="nav-label">Workspace</p><button class="nav-link active" data-view="overview"><i>+</i>Overview</button><button class="nav-link" data-view="tickets"><i>#</i>Tickets <em>12</em></button><button class="nav-link" data-view="quotes"><i>Q</i>Quotes <em id="quoteCount">2</em></button><button class="nav-link" data-view="companies"><i>O</i>Companies</button><button class="nav-link" data-view="projects"><i>/</i>Projects</button><button class="nav-link" data-view="assets"><i>[]</i>Assets</button><p class="nav-label">Manage</p><button class="nav-link" data-view="billing"><i>$</i>Billing <em id="billingCount">3</em></button><button class="nav-link" data-view="reports"><i>=</i>Reports</button></nav>
+<div class="nav-bottom"><button class="nav-link"><i>?</i>Help center</button><div class="user-card"><span class="avatar">JR</span><span><b>Jordan Reed</b><small>Administrator</small></span><span>...</span></div></div></aside>
+<main class="main"><header class="topbar"><button class="mobile-menu" id="menuBtn">=</button><div class="crumbs"><span>Workspace</span><b>/</b><strong id="pageCrumb">Overview</strong></div><div class="top-actions"><button class="icon-button">/</button><button class="icon-button">*</button><button class="new-button" id="newTicketBtn">+ <span>New ticket</span></button></div></header>
+<section class="content" id="content"><div class="view active-view" id="overviewView"><div class="page-heading"><div><p class="eyebrow">Tuesday, September 23, 2026</p><h1>Good morning, Jordan.</h1><p class="subheading">Here is what needs your attention across the service desk.</p></div><button class="date-button">Last 30 days <span>v</span></button></div>
+<div class="metric-grid"><article class="metric"><div class="metric-top"><span>Open tickets</span><b class="metric-icon coral">#</b></div><strong>24</strong><span class="trend up">+8.2% <i>from last month</i></span><div class="spark coral-spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article><article class="metric"><div class="metric-top"><span>Billable hours</span><b class="metric-icon mint">T</b></div><strong>186.5</strong><span class="trend up">+12.4% <i>from last month</i></span><div class="spark mint-spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article><article class="metric"><div class="metric-top"><span>Unbilled work</span><b class="metric-icon gold">$</b></div><strong>$8,420</strong><span class="trend down">-3.1% <i>from last month</i></span><div class="spark gold-spark"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article><article class="metric"><div class="metric-top"><span>CSAT score</span><b class="metric-icon blue">S</b></div><strong>4.8 <small>/ 5</small></strong><span class="trend up">+0.3 <i>from last month</i></span><div class="rating-row"><b>4.8</b><span>Excellent</span></div></article></div>
+<div class="section-grid"><section class="panel"><div class="panel-heading"><div><h2>Needs attention</h2><p>Prioritized work across your team</p></div><button class="text-button" data-view-link="tickets">View all -></button></div><div id="attentionList"></div></section><section class="panel"><div class="panel-heading"><div><h2>Team activity</h2><p>Recent updates from your workspace</p></div><button class="icon-button">...</button></div><div class="activity-list"><div class="activity"><span class="avatar small green">AM</span><p><b>Alex Morgan</b> logged 2.5 hours on <strong>Website refresh</strong><small>12 minutes ago</small></p></div><div class="activity"><span class="avatar small orange">SK</span><p><b>Sam Kim</b> closed ticket <strong>#1048</strong><small>38 minutes ago</small></p></div><div class="activity"><span class="avatar small blue">JR</span><p><b>You</b> created a new project <strong>Q4 onboarding</strong><small>1 hour ago</small></p></div><div class="activity"><span class="avatar small pink">LC</span><p><b>Lee Chen</b> added an asset to <strong>Horizon Labs</strong><small>2 hours ago</small></p></div></div></section></div>
+<section class="panel table-panel"><div class="panel-heading"><div><h2>Active projects</h2><p>Projects currently in motion</p></div><button class="text-button" data-view-link="projects">All projects -></button></div><div class="table-wrap"><table><thead><tr><th>Project</th><th>Company</th><th>Owner</th><th>Progress</th><th>Due date</th><th>Status</th></tr></thead><tbody><tr><td><b>Website refresh</b><small>Implementation</small></td><td>Horizon Labs</td><td>Sam Kim</td><td><div class="progress"><span style="width:72%"></span></div><small>72%</small></td><td>Oct 04, 2026</td><td><span class="badge on-track">On track</span></td></tr><tr><td><b>Q4 onboarding</b><small>Consulting</small></td><td>Wavelength Co.</td><td>Alex Morgan</td><td><div class="progress"><span style="width:38%"></span></div><small>38%</small></td><td>Oct 18, 2026</td><td><span class="badge planning">Planning</span></td></tr><tr><td><b>Security audit</b><small>Managed services</small></td><td>Northwind Health</td><td>Jordan Reed</td><td><div class="progress"><span style="width:91%"></span></div><small>91%</small></td><td>Sep 29, 2026</td><td><span class="badge at-risk">At risk</span></td></tr></tbody></table></div></section></div>
+<div class="view" id="ticketsView"><div class="page-heading"><div><p class="eyebrow">Service desk</p><h1>Tickets</h1><p class="subheading">A clear queue for every request, incident, and follow-up.</p></div><button class="new-button" id="newTicketBtnAlt">+ New ticket</button></div><div class="ticket-toolbar"><div class="search-box">/ <input id="ticketSearch" placeholder="Search tickets, companies, or IDs"></div><div class="segmented"><button class="selected">All <b>24</b></button><button>My tickets <b>8</b></button><button>Unassigned <b>3</b></button></div></div><section class="panel table-panel"><div class="table-wrap"><table class="ticket-table"><thead><tr><th>Ticket</th><th>Company</th><th>Assignee</th><th>Priority</th><th>Status</th><th>Updated</th></tr></thead><tbody id="ticketRows"></tbody></table></div></section></div>
+<div class="view" id="quotesView"><div class="page-heading"><div><p class="eyebrow">Commercial workflow</p><h1>Quotes</h1><p class="subheading">Turn approved service work into clear, billable commitments.</p></div><button class="new-button" id="newQuoteBtn">+ New quote</button></div><section class="panel quote-panel"><div class="quote-steps"><span class="done">1. Scope</span><span class="done">2. Price</span><span class="current">3. Approval</span><span>4. Billing</span></div><div class="quote-card"><div><p class="eyebrow">Draft quote <span id="quoteTicket">from ticket #1052</span></p><h2 id="quoteTitle">VPN access for new hire</h2><p id="quoteCompany">Horizon Labs</p></div><strong id="quoteTotal">$1,250.00</strong></div><div class="quote-lines"><div><span>Implementation and configuration</span><b>$950.00</b></div><div><span>Security review</span><b>$300.00</b></div><div class="quote-total"><span>Total</span><b>$1,250.00</b></div></div><div class="quote-actions"><button class="ghost-button" id="editQuoteBtn">Edit quote</button><button class="new-button" id="approveQuoteBtn">Approve and send to billing</button></div></section></div>
+<div class="view placeholder-view" id="companiesView"><p class="eyebrow">Directory</p><h1>Companies</h1><p class="subheading">Keep customer relationships, contacts, and service health in one place.</p><div class="company-grid"><article><span class="company-logo coral-bg">H</span><div><b>Horizon Labs</b><small>18 active assets / 4 open tickets</small></div><span class="health good">Healthy</span></article><article><span class="company-logo blue-bg">W</span><div><b>Wavelength Co.</b><small>32 active assets / 2 open tickets</small></div><span class="health good">Healthy</span></article><article><span class="company-logo gold-bg">N</span><div><b>Northwind Health</b><small>46 active assets / 6 open tickets</small></div><span class="health watch">Watch</span></article></div></div>
+<div class="view placeholder-view" id="projectsView"><p class="eyebrow">Delivery</p><h1>Projects</h1><p class="subheading">See delivery progress, ownership, and milestones at a glance.</p><div class="project-callout"><div><b class="metric-icon mint">/</b><h2>3 projects in motion</h2><p>Two are on track. One needs a risk review this week.</p></div><button class="new-button">+ New project</button></div></div>
+<div class="view placeholder-view" id="assetsView"><p class="eyebrow">Inventory</p><h1>Assets</h1><p class="subheading">Know what is deployed, who owns it, and when it needs attention.</p><div class="asset-stats"><div><strong>96</strong><span>Total assets</span></div><div><strong>8</strong><span>Needs review</span></div><div><strong>14</strong><span>Warranty expiring</span></div></div></div>
+<div class="view placeholder-view" id="billingView"><p class="eyebrow">Finance</p><h1>Billing</h1><p class="subheading">Turn approved time and expenses into clean, predictable invoices.</p><div class="project-callout"><div><b class="metric-icon gold">$</b><h2>$42,860 ready to invoice</h2><p>Across 7 clients for the current billing cycle.</p></div><button class="new-button" id="reviewBillingBtn">Review billing</button></div><section class="panel billing-queue"><div class="panel-heading"><div><h2>Ready to invoice</h2><p>Quotes approved by customers</p></div><span class="badge planning">3 drafts</span></div><div class="billing-row"><span class="company-logo coral-bg">H</span><span><b id="billingTitle">Horizon Labs - VPN access</b><small>Approved just now · Net 30</small></span><strong id="billingAmount">$1,250.00</strong><button class="new-button" id="createInvoiceBtn">Create invoice</button></div></section></div>
+<div class="view placeholder-view" id="reportsView"><p class="eyebrow">Insights</p><h1>Reports</h1><p class="subheading">Understand service performance without wrestling with spreadsheets.</p><div class="report-bars"><i style="height:42%"></i><i style="height:58%"></i><i style="height:52%"></i><i style="height:76%"></i><i style="height:68%"></i><i style="height:88%"></i><i style="height:82%"></i></div></div><footer class="product-footer">ConnectWiser is developed and owned by <b>PackScan</b> · © 2026 PackScan</footer></section></main></div>
+<div class="drawer-backdrop" id="drawerBackdrop"></div><aside class="drawer" id="ticketDrawer"><button class="drawer-close" id="closeDrawer">x</button><p class="eyebrow">Ticket details</p><h2 id="drawerTitle"></h2><p class="drawer-id" id="drawerId"></p><div class="drawer-tags"><span class="badge urgent">High priority</span><span class="badge open">Open</span></div><div class="drawer-block"><label>Company</label><b id="drawerCompany"></b></div><div class="drawer-block"><label>Assigned to</label><b id="drawerAssignee"></b></div><div class="drawer-block"><label>Description</label><p id="drawerDescription"></p></div><div class="drawer-footer"><button class="ghost-button" id="closeTicket">Close ticket</button><button class="new-button" id="createQuoteBtn">Create quote</button></div></aside><div class="toast" id="toast">Ticket updated</div>
+<script>
+const tickets=[{id:'#1052',title:'VPN access for new hire',company:'Horizon Labs',assignee:'Sam Kim',initials:'SK',tone:'orange',priority:'High',status:'Open',updated:'12 min ago',description:'New team member starts Monday and needs VPN access configured for the engineering network.'},{id:'#1051',title:'Email delivery delays',company:'Northwind Health',assignee:'Unassigned',initials:'--',tone:'blue',priority:'Urgent',status:'Open',updated:'24 min ago',description:'Several outbound notifications are arriving late for the clinical operations team.'},{id:'#1049',title:'Replace laptop battery',company:'Wavelength Co.',assignee:'Alex Morgan',initials:'AM',tone:'green',priority:'Normal',status:'In progress',updated:'1 hr ago',description:'The battery in the finance lead laptop is reporting less than two hours of life.'},{id:'#1048',title:'Quarterly access review',company:'Horizon Labs',assignee:'Lee Chen',initials:'LC',tone:'pink',priority:'Low',status:'Closed',updated:'2 hr ago',description:'Review completed for Q3 access groups and dormant accounts.'},{id:'#1046',title:'New office network drops',company:'Wavelength Co.',assignee:'Sam Kim',initials:'SK',tone:'orange',priority:'Normal',status:'In progress',updated:'3 hr ago',description:'Install and label six network drops in the new second-floor office.'},{id:'#1044',title:'Backup alert investigation',company:'Northwind Health',assignee:'Jordan Reed',initials:'JR',tone:'blue',priority:'High',status:'Open',updated:'Yesterday',description:'A nightly backup completed with warnings on two database volumes.'}];
+const row=t=>`<tr data-ticket="${t.id}"><td><b>${t.id}</b><strong>${t.title}</strong></td><td>${t.company}</td><td>${t.assignee}</td><td><span class="priority ${t.priority.toLowerCase()}">${t.priority}</span></td><td><span class="badge ${t.status.toLowerCase().replace(' ','-')}">${t.status}</span></td><td>${t.updated}</td></tr>`;function renderTickets(q=''){document.getElementById('ticketRows').innerHTML=tickets.filter(t=>`${t.id} ${t.title} ${t.company}`.toLowerCase().includes(q.toLowerCase())).map(row).join('');document.querySelectorAll('#ticketRows tr').forEach(r=>r.onclick=()=>openTicket(r.dataset.ticket))}renderTickets();document.getElementById('attentionList').innerHTML=tickets.slice(0,3).map(t=>`<button class="attention-row" data-ticket="${t.id}"><span class="priority ${t.priority.toLowerCase()}">${t.priority}</span><span><b>${t.title}</b><small>${t.company} · ${t.id}</small></span><span>-></span></button>`).join('');document.querySelectorAll('.attention-row').forEach(r=>r.onclick=()=>openTicket(r.dataset.ticket));
+let currentTicketId='#1052';function openTicket(id){const t=tickets.find(x=>x.id===id);if(!t)return;currentTicketId=t.id;document.getElementById('drawerTitle').textContent=t.title;document.getElementById('drawerId').textContent=`${t.id} · Updated ${t.updated}`;document.getElementById('drawerCompany').textContent=t.company;document.getElementById('drawerAssignee').textContent=t.assignee;document.getElementById('drawerDescription').textContent=t.description;document.getElementById('ticketDrawer').classList.add('open');document.getElementById('drawerBackdrop').classList.add('open')}function closeDrawer(){document.getElementById('ticketDrawer').classList.remove('open');document.getElementById('drawerBackdrop').classList.remove('open')}document.getElementById('closeDrawer').addEventListener('click',closeDrawer);document.getElementById('drawerBackdrop').addEventListener('click',closeDrawer);document.getElementById('closeTicket').onclick=()=>{closeDrawer();document.getElementById('toast').textContent='Ticket closed';document.getElementById('toast').classList.add('show');setTimeout(()=>document.getElementById('toast').classList.remove('show'),2200)};document.getElementById('ticketSearch').oninput=e=>renderTickets(e.target.value);
+function showView(v){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active-view'));document.getElementById(v+'View').classList.add('active-view');document.querySelectorAll('.nav-link[data-view]').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.getElementById('pageCrumb').textContent=v[0].toUpperCase()+v.slice(1);document.getElementById('nav').classList.remove('mobile-open')}document.querySelectorAll('.nav-link[data-view],[data-view-link]').forEach(x=>x.onclick=()=>showView(x.dataset.view||x.dataset.viewLink));document.getElementById('menuBtn').onclick=()=>document.getElementById('nav').classList.toggle('mobile-open');document.querySelectorAll('#newTicketBtn,#newTicketBtnAlt').forEach(x=>x.onclick=()=>{document.getElementById('toast').textContent='New ticket form is ready';document.getElementById('toast').classList.add('show');setTimeout(()=>document.getElementById('toast').classList.remove('show'),2200)});function prepareQuote(){const t=tickets.find(x=>x.id===currentTicketId)||tickets[0];document.getElementById('quoteTitle').textContent=t.title;document.getElementById('quoteCompany').textContent=t.company;document.getElementById('quoteTicket').textContent=`from ticket ${t.id}`;document.getElementById('billingTitle').textContent=`${t.company} - ${t.title}`;showView('quotes');closeDrawer()}document.getElementById('createQuoteBtn').onclick=prepareQuote;document.getElementById('approveQuoteBtn').onclick=()=>{document.getElementById('quoteCount').textContent='1';document.getElementById('billingCount').textContent='4';showView('billing');document.getElementById('toast').textContent='Quote approved and added to billing';document.getElementById('toast').classList.add('show');setTimeout(()=>document.getElementById('toast').classList.remove('show'),2400)};document.getElementById('createInvoiceBtn').onclick=()=>{document.getElementById('createInvoiceBtn').textContent='Invoice created';document.getElementById('createInvoiceBtn').disabled=true;document.getElementById('toast').textContent='Invoice created and ready to send';document.getElementById('toast').classList.add('show');setTimeout(()=>document.getElementById('toast').classList.remove('show'),2400)};
+</script><script>
+const originalApproveQuote = document.getElementById('approveQuoteBtn').onclick;
+document.getElementById('approveQuoteBtn').onclick = async () => {
+	if (!window.PACKSCAN_HOSTED || !window.PACKSCAN_SHOP) {
+		originalApproveQuote();
+		return;
+	}
+	const button = document.getElementById('approveQuoteBtn');
+	button.disabled = true;
+	button.textContent = 'Sending quote to billing...';
+	const ticket = tickets.find(item => item.id === currentTicketId) || tickets[0];
+	try {
+		const response = await fetch('/api/connectwiser/quote', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({title: ticket.title, company: ticket.company, description: ticket.description, amount: 1250, ticketId: ticket.id})
+		});
+		const result = await response.json();
+		if (!response.ok) throw new Error(result.error || 'Could not create the billing record');
+		originalApproveQuote();
+		document.dispatchEvent(new CustomEvent('connectwiser:quote-approved'));
+		document.getElementById('toast').textContent = `${result.quote.name} added to billing`;
+	} catch (error) {
+		button.disabled = false;
+		button.textContent = 'Approve and send to billing';
+		document.getElementById('toast').textContent = error.message;
+		document.getElementById('toast').classList.add('show');
+		setTimeout(() => document.getElementById('toast').classList.remove('show'), 3000);
+	}
+};
+</script><script>
+const workflowStorageKey = 'connectwiser_workflow';
+const workflowState = JSON.parse(localStorage.getItem(workflowStorageKey) || '{}');
+const saveWorkflow = () => localStorage.setItem(workflowStorageKey, JSON.stringify(workflowState));
+if (workflowState.quoteCount) document.getElementById('quoteCount').textContent = workflowState.quoteCount;
+if (workflowState.billingCount) document.getElementById('billingCount').textContent = workflowState.billingCount;
+if (workflowState.title) {
+	document.getElementById('quoteTitle').textContent = workflowState.title;
+	document.getElementById('quoteCompany').textContent = workflowState.company || '';
+	document.getElementById('quoteTicket').textContent = `from ticket ${workflowState.ticketId || ''}`;
+	document.getElementById('billingTitle').textContent = `${workflowState.company || ''} - ${workflowState.title}`;
+}
+if (workflowState.invoiceCreated) {
+	const invoiceButton = document.getElementById('createInvoiceBtn');
+	invoiceButton.textContent = 'Invoice created';
+	invoiceButton.disabled = true;
+}
+document.getElementById('createQuoteBtn').addEventListener('click', () => {
+	const ticket = tickets.find(item => item.id === currentTicketId) || tickets[0];
+	workflowState.title = ticket.title;
+	workflowState.company = ticket.company;
+	workflowState.ticketId = ticket.id;
+	saveWorkflow();
+});
+document.addEventListener('connectwiser:quote-approved', () => {
+	workflowState.quoteCount = '1';
+	workflowState.billingCount = '4';
+	workflowState.approved = true;
+	saveWorkflow();
+});
+document.getElementById('createInvoiceBtn').addEventListener('click', () => {
+	workflowState.invoiceCreated = true;
+	saveWorkflow();
+});
+document.getElementById('newQuoteBtn').addEventListener('click', () => {
+	showView('quotes');
+	document.getElementById('quoteTitle').textContent = 'New service quote';
+	document.getElementById('quoteCompany').textContent = 'Select a company';
+	document.getElementById('quoteTicket').textContent = 'not linked to a ticket';
+});
+document.getElementById('reviewBillingBtn').addEventListener('click', () => showView('billing'));
+document.getElementById('editQuoteBtn').addEventListener('click', () => {
+	const title = window.prompt('Quote name', document.getElementById('quoteTitle').textContent);
+	if (!title) return;
+	const amount = window.prompt('Total amount', document.getElementById('quoteTotal').textContent.replace(/[$,]/g, ''));
+	const parsedAmount = Number(amount);
+	if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+		document.getElementById('toast').textContent = 'Enter a valid positive amount';
+		document.getElementById('toast').classList.add('show');
+		setTimeout(() => document.getElementById('toast').classList.remove('show'), 2400);
+		return;
+	}
+	const formattedAmount = parsedAmount.toLocaleString('en-US', {style: 'currency', currency: 'USD'});
+	document.getElementById('quoteTitle').textContent = title;
+	document.getElementById('quoteTotal').textContent = formattedAmount;
+	document.querySelector('.quote-total b').textContent = formattedAmount;
+	workflowState.title = title;
+	workflowState.amount = parsedAmount;
+	saveWorkflow();
+});
+</script></body></html>
