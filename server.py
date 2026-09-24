@@ -777,6 +777,12 @@ class Handler(SimpleHTTPRequestHandler):
             errors = parsed.get("errors") or parsed.get("data", {}).get("draftOrderCreate", {}).get("userErrors", [])
             if errors:
                 message = "; ".join(item.get("message", "Shopify quote failed") for item in errors)
+                if "access" in message.lower() and ("draft" in message.lower() or "scope" in message.lower()):
+                    message = (
+                        "Shopify has not approved write_draft_orders for this app. "
+                        "Add that permission to the app version, release it, then uninstall and reinstall "
+                        "Connect-Wiser on the development store."
+                    )
                 return self._json(502 if status < 400 else status, {"error": message})
             draft = parsed.get("data", {}).get("draftOrderCreate", {}).get("draftOrder")
             if not draft:
