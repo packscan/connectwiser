@@ -148,4 +148,21 @@ newTicketModal.querySelector('form').onsubmit = event => {
 	document.querySelectorAll('.attention-row').forEach(row=>row.onclick=()=>openTicket(row.dataset.ticket));
 	closeNewTicket(); showView('tickets'); openTicket(ticket.id);
 };
+</script><script>
+document.getElementById('createQuoteBtn').onclick = event => {
+	event.preventDefault();
+	const ticket = tickets.find(item => item.id === currentTicketId) || tickets[0];
+	document.getElementById('quoteTitle').textContent = ticket.title;
+	document.getElementById('quoteCompany').textContent = ticket.company;
+	document.getElementById('quoteTicket').textContent = `from ticket ${ticket.id}`;
+	document.getElementById('billingTitle').textContent = `${ticket.company} - ${ticket.title}`;
+	if (typeof workflowState !== 'undefined') {
+		workflowState.title = ticket.title;
+		workflowState.company = ticket.company;
+		workflowState.ticketId = ticket.id;
+		saveWorkflow();
+	}
+	closeDrawer();
+	showView('quotes');
+};
 </script></body></html>
