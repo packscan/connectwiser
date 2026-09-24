@@ -67,9 +67,14 @@ const workflowStorageKey = 'connectwiser_workflow';
 const workflowState = JSON.parse(localStorage.getItem(workflowStorageKey) || '{}');
 const saveWorkflow = () => {
 	localStorage.setItem(workflowStorageKey, JSON.stringify(workflowState));
-	if (window.PACKSCAN_HOSTED && window.PACKSCAN_SHOP) {
-		fetch('/api/connectwiser/workflow', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(workflowState)}).catch(() => {});
+	if (!window.PACKSCAN_HOSTED) return;
+	if (!window.PACKSCAN_SHOP) {
+		if (typeof auditToast === 'function') auditToast('Connect your commerce account to save live quotes and billing');
+		return;
 	}
+	fetch('/api/connectwiser/workflow', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(workflowState)})
+		.then(response => response.ok ? null : response.json().then(data => { throw new Error(data.error || 'Workflow could not be saved'); }))
+		.catch(error => { if (typeof auditToast === 'function') auditToast(error.message); });
 };
 if (workflowState.quoteCount) document.getElementById('quoteCount').textContent = workflowState.quoteCount;
 if (workflowState.billingCount) document.getElementById('billingCount').textContent = workflowState.billingCount;
@@ -211,6 +216,23 @@ reviewQuoteButton.textContent = 'Review quote';
 invoiceButton.parentNode.insertBefore(reviewQuoteButton, invoiceButton);
 reviewQuoteButton.addEventListener('click', () => { showView('quotes'); auditToast('Quote review opened'); });
 const topButtons = document.querySelectorAll('.top-actions .icon-button');
+if (window.PACKSCAN_HOSTED && !window.PACKSCAN_SHOP) {
+	const connectButton = document.createElement('button');
+	connectButton.className = 'ghost-button';
+	connectButton.type = 'button';
+	connectButton.textContent = 'Connect account';
+	connectButton.addEventListener('click', () => {
+		const shop = window.prompt('Enter your Shopify store domain, for example acme.myshopify.com');
+		if (!shop) return;
+		const normalizedShop = shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+		if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(normalizedShop)) {
+			auditToast('Enter a valid .myshopify.com store domain');
+			return;
+		}
+		window.location.href = `/auth?shop=${encodeURIComponent(normalizedShop)}`;
+	});
+	document.querySelector('.top-actions')?.prepend(connectButton);
+}
 topButtons[0]?.addEventListener('click', () => { showView('tickets'); document.getElementById('ticketSearch').focus(); });
 topButtons[1]?.addEventListener('click', () => auditToast('You are all caught up'));
 document.querySelector('.date-button')?.addEventListener('click', event => {
