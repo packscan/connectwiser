@@ -1,8 +1,8 @@
-# PackScan and ConnectWiser
+# PackScan and Connect-Wiser.com
 
-ConnectWiser is a PackScan product. PackScan is the developer and owner of ConnectWiser.
+Connect-Wiser.com is a PackScan product. PackScan is the developer and owner of Connect-Wiser.com.
 
-ConnectWiser is the service-operations workspace at `/ops`. It covers the workflow from ticket intake to quote approval and invoice creation. The workspace currently uses local demo data so the product flow can be tested on Render without exposing customer records.
+Connect-Wiser.com is the service-operations workspace at `/ops`. It covers the workflow from ticket intake to quote approval and invoice creation. The workspace currently uses local demo data so the product flow can be tested on Render without exposing customer records.
 
 ## ConnectWiser on Render
 
