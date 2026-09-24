@@ -776,7 +776,17 @@ class Handler(SimpleHTTPRequestHandler):
             parsed = json.loads(data.decode("utf-8", "replace"))
             errors = parsed.get("errors") or parsed.get("data", {}).get("draftOrderCreate", {}).get("userErrors", [])
             if errors:
-                message = "; ".join(item.get("message", "Shopify quote failed") for item in errors)
+                if isinstance(errors, (str, dict)):
+                    errors = [errors]
+                messages = []
+                for item in errors:
+                    if isinstance(item, str):
+                        messages.append(item)
+                    elif isinstance(item, dict):
+                        messages.append(item.get("message") or item.get("detail") or json.dumps(item))
+                    else:
+                        messages.append(str(item))
+                message = "; ".join(messages) or "Shopify quote failed"
                 if "access" in message.lower() and ("draft" in message.lower() or "scope" in message.lower()):
                     message = (
                         "Shopify has not approved write_draft_orders for this app. "
