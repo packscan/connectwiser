@@ -37,7 +37,7 @@ Carrier keys (FedEx / UPS / USPS) still stay in the merchant’s browser Setting
 2. App URL: `https://YOUR-HOST/`
 3. Allowed redirection URL(s): `https://YOUR-HOST/auth/callback`
 4. Scopes:
-   `read_orders,read_products,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders`
+   `read_orders,write_orders,write_draft_orders,read_products,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,write_fulfillments`
 5. Copy **Client ID** and **Client secret**.
 6. Distribution: Public app when you want the App Store. Use a custom distribution / test store first.
 

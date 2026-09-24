@@ -32,7 +32,7 @@ except ValueError:
     SHOPIFY_PLAN_TRIAL_DAYS = 14
 SCOPES = os.environ.get(
     "SHOPIFY_SCOPES",
-    "read_orders,write_orders,read_products,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,write_fulfillments",
+    "read_orders,write_orders,write_draft_orders,read_products,read_locations,read_merchant_managed_fulfillment_orders,write_merchant_managed_fulfillment_orders,write_fulfillments",
 )
 HOSTED = bool(API_KEY and API_SECRET and HOST)
 ENVIRONMENT = os.environ.get("PACKSCAN_ENV", "").strip().lower()
