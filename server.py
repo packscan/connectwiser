@@ -627,13 +627,13 @@ class Handler(SimpleHTTPRequestHandler):
             billing_url = billing_confirmation_url(self, shop, token)
             self.send_response(302)
             self.send_header("Set-Cookie", cookie)
-            self.send_header("Location", billing_url or "/")
+            self.send_header("Location", billing_url or "/ops")
             self.end_headers()
             return
 
         if path == "/billing/return":
             self.send_response(302)
-            self.send_header("Location", "/")
+            self.send_header("Location", "/ops")
             self.end_headers()
             return
 
