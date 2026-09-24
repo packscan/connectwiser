@@ -65,7 +65,12 @@ document.getElementById('approveQuoteBtn').onclick = async () => {
 </script><script>
 const workflowStorageKey = 'connectwiser_workflow';
 const workflowState = JSON.parse(localStorage.getItem(workflowStorageKey) || '{}');
-const saveWorkflow = () => localStorage.setItem(workflowStorageKey, JSON.stringify(workflowState));
+const saveWorkflow = () => {
+	localStorage.setItem(workflowStorageKey, JSON.stringify(workflowState));
+	if (window.PACKSCAN_HOSTED && window.PACKSCAN_SHOP) {
+		fetch('/api/connectwiser/workflow', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(workflowState)}).catch(() => {});
+	}
+};
 if (workflowState.quoteCount) document.getElementById('quoteCount').textContent = workflowState.quoteCount;
 if (workflowState.billingCount) document.getElementById('billingCount').textContent = workflowState.billingCount;
 if (workflowState.title) {
@@ -78,6 +83,19 @@ if (workflowState.invoiceCreated) {
 	const invoiceButton = document.getElementById('createInvoiceBtn');
 	invoiceButton.textContent = 'Invoice created';
 	invoiceButton.disabled = true;
+}
+if (window.PACKSCAN_HOSTED && window.PACKSCAN_SHOP) {
+	fetch('/api/connectwiser/workflow').then(response => response.ok ? response.json() : null).then(remoteState => {
+		if (!remoteState || !Object.keys(remoteState).length) return;
+		Object.assign(workflowState, remoteState);
+		localStorage.setItem(workflowStorageKey, JSON.stringify(workflowState));
+		if (workflowState.title) {
+			document.getElementById('quoteTitle').textContent = workflowState.title;
+			document.getElementById('quoteCompany').textContent = workflowState.company || '';
+			document.getElementById('quoteTicket').textContent = `from ticket ${workflowState.ticketId || ''}`;
+			document.getElementById('billingTitle').textContent = `${workflowState.company || ''} - ${workflowState.title}`;
+		}
+	}).catch(() => {});
 }
 document.getElementById('createQuoteBtn').addEventListener('click', () => {
 	const ticket = tickets.find(item => item.id === currentTicketId) || tickets[0];

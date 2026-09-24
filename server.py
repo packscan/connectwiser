@@ -581,6 +581,9 @@ class Handler(SimpleHTTPRequestHandler):
             installed = bool(shop and shop in load_shops())
             return self._json(200, {"hosted": HOSTED, "shop": shop, "installed": installed})
 
+        if path == "/api/connectwiser/workflow":
+            return self._connectwiser_workflow("GET")
+
         if path == "/auth":
             shop = safe_shop((params.get("shop") or [""])[0])
             if not shop or not HOSTED:
@@ -669,6 +672,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._compliance_webhook(path)
         if path == "/api/connectwiser/quote":
             return self._connectwiser_quote()
+        if path == "/api/connectwiser/workflow":
+            return self._connectwiser_workflow("POST")
         if path == "/api/fedex/label":
             return self._fedex_label()
         if path == "/api/fedex/rates":
@@ -771,6 +776,42 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(201, {"quote": draft, "provider": "shopify"})
         except Exception as exc:
             return self._json(502, {"error": "Shopify quote creation failed", "details": str(exc)})
+
+    def _connectwiser_workflow(self, method):
+        shop = read_session(self.headers.get("Cookie"))
+        if not shop or not shop_access_token(shop):
+            return self._json(401, {"error": "Connect a commerce account before saving workflow data"})
+        shops = load_shops()
+        record = shops.get(shop)
+        if not isinstance(record, dict):
+            return self._json(401, {"error": "Connected account was not found"})
+        if method == "GET":
+            workflow = record.get("connectwiser_workflow")
+            return self._json(200, workflow if isinstance(workflow, dict) else {})
+
+        length = int(self.headers.get("Content-Length", "0"))
+        if length > 64 * 1024:
+            return self._json(413, {"error": "Workflow payload is too large"})
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8") if length else "{}")
+        except json.JSONDecodeError:
+            return self._json(400, {"error": "Invalid JSON"})
+        if not isinstance(payload, dict):
+            return self._json(400, {"error": "Workflow payload must be an object"})
+        allowed = {"title", "company", "ticketId", "amount", "quoteCount", "billingCount", "approved", "invoiceCreated"}
+        workflow = {key: payload[key] for key in allowed if key in payload}
+        for key in ("title", "company", "ticketId"):
+            if key in workflow:
+                workflow[key] = str(workflow[key])[:255]
+        if "amount" in workflow:
+            try:
+                workflow["amount"] = round(float(workflow["amount"]), 2)
+            except (TypeError, ValueError):
+                return self._json(400, {"error": "Workflow amount must be numeric"})
+        record["connectwiser_workflow"] = workflow
+        shops[shop] = record
+        save_shops(shops)
+        return self._json(200, workflow)
 
     def _admin(self, shop, token, payload):
         body = json.dumps({"query": payload["query"], "variables": payload.get("variables") or {}}).encode()
