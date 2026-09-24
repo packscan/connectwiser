@@ -122,4 +122,30 @@ document.getElementById('editQuoteBtn').addEventListener('click', () => {
 	workflowState.amount = parsedAmount;
 	saveWorkflow();
 });
+</script><script>
+const newTicketStyle = document.createElement('style');
+newTicketStyle.textContent = '.ticket-form{display:grid;gap:14px}.ticket-form label{display:grid;gap:6px;color:#73808b;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}.ticket-form input,.ticket-form select,.ticket-form textarea{border:1px solid #e4e9e9;border-radius:7px;padding:10px;color:#18222d;background:#fff}.ticket-form textarea{min-height:100px;resize:vertical}.ticket-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}';
+document.head.appendChild(newTicketStyle);
+const newTicketModal = document.createElement('div');
+newTicketModal.className = 'drawer-backdrop';
+newTicketModal.id = 'newTicketModal';
+newTicketModal.innerHTML = '<div class="drawer" style="position:absolute;right:50%;top:50%;bottom:auto;transform:translate(50%,-50%);width:min(480px,calc(100% - 30px));padding:30px"><button class="drawer-close" type="button" aria-label="Close new ticket">x</button><p class="eyebrow">Service desk</p><h2>New ticket</h2><p class="drawer-id">Capture the request and route it to your team.</p><form class="ticket-form"><label>Company<input name="company" placeholder="Company name" required></label><label>Subject<input name="title" placeholder="What needs attention?" required></label><label>Priority<select name="priority"><option>Normal</option><option>High</option><option>Urgent</option><option>Low</option></select></label><label>Description<textarea name="description" placeholder="Add useful context for the assigned technician"></textarea></label><div class="ticket-form-actions"><button class="ghost-button" type="button" data-cancel>Cancel</button><button class="new-button" type="submit">Create ticket</button></div></form></div>';
+document.body.appendChild(newTicketModal);
+const newTicketPanel = newTicketModal.querySelector('.drawer');
+const closeNewTicket = () => { newTicketModal.classList.remove('open'); newTicketPanel.classList.remove('open'); };
+const openNewTicket = () => { newTicketModal.classList.add('open'); newTicketPanel.classList.add('open'); newTicketModal.querySelector('input[name="company"]').focus(); };
+document.querySelectorAll('#newTicketBtn,#newTicketBtnAlt').forEach(button => { button.onclick = openNewTicket; });
+newTicketModal.querySelector('.drawer-close').onclick = closeNewTicket;
+newTicketModal.querySelector('[data-cancel]').onclick = closeNewTicket;
+newTicketModal.addEventListener('click', event => { if (event.target === newTicketModal) closeNewTicket(); });
+newTicketModal.querySelector('form').onsubmit = event => {
+	event.preventDefault();
+	const values = Object.fromEntries(new FormData(event.currentTarget));
+	const ticket = {id:'#'+(1053+tickets.length), title:values.title, company:values.company, assignee:'Unassigned', initials:'--', tone:'blue', priority:values.priority, status:'Open', updated:'Just now', description:values.description || 'No description provided.'};
+	tickets.unshift(ticket);
+	renderTickets();
+	document.getElementById('attentionList').innerHTML = tickets.slice(0,3).map(t=>`<button class="attention-row" data-ticket="${t.id}"><span class="priority ${t.priority.toLowerCase()}">${t.priority}</span><span><b>${t.title}</b><small>${t.company} · ${t.id}</small></span><span>-></span></button>`).join('');
+	document.querySelectorAll('.attention-row').forEach(row=>row.onclick=()=>openTicket(row.dataset.ticket));
+	closeNewTicket(); showView('tickets'); openTicket(ticket.id);
+};
 </script></body></html>
