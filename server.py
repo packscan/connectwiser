@@ -585,6 +585,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._connectwiser_workflow("GET")
         if path == "/api/connectwiser/tickets":
             return self._connectwiser_tickets("GET")
+        if path == "/api/connectwiser/invoices":
+            return self._connectwiser_invoices("GET")
 
         if path == "/auth":
             shop = safe_shop((params.get("shop") or [""])[0])
@@ -678,6 +680,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._connectwiser_workflow("POST")
         if path == "/api/connectwiser/tickets":
             return self._connectwiser_tickets("POST")
+        if path == "/api/connectwiser/invoices":
+            return self._connectwiser_invoices("POST")
         if path == "/api/fedex/label":
             return self._fedex_label()
         if path == "/api/fedex/rates":
@@ -860,6 +864,50 @@ class Handler(SimpleHTTPRequestHandler):
         shops[shop] = record
         save_shops(shops)
         return self._json(201, {"ticket": ticket})
+
+    def _connectwiser_invoices(self, method):
+        shop = read_session(self.headers.get("Cookie"))
+        if not shop or not shop_access_token(shop):
+            return self._json(401, {"error": "Connect a commerce account before saving invoices"})
+        shops = load_shops()
+        record = shops.get(shop)
+        if not isinstance(record, dict):
+            return self._json(401, {"error": "Connected account was not found"})
+        stored = record.get("connectwiser_invoices")
+        invoices = stored if isinstance(stored, list) else []
+        if method == "GET":
+            return self._json(200, {"invoices": invoices})
+
+        length = int(self.headers.get("Content-Length", "0"))
+        if length > 32 * 1024:
+            return self._json(413, {"error": "Invoice payload is too large"})
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8") if length else "{}")
+        except json.JSONDecodeError:
+            return self._json(400, {"error": "Invalid JSON"})
+        if not isinstance(payload, dict):
+            return self._json(400, {"error": "Invoice payload must be an object"})
+        title = str(payload.get("title") or "").strip()[:255]
+        company = str(payload.get("company") or "").strip()[:255]
+        try:
+            amount = round(float(payload.get("amount", 0)), 2)
+        except (TypeError, ValueError):
+            return self._json(400, {"error": "Invoice amount must be numeric"})
+        if not title or not company or amount <= 0:
+            return self._json(400, {"error": "Invoice title, company, and positive amount are required"})
+        invoice = {
+            "id": "inv-" + uuid.uuid4().hex[:12],
+            "title": title,
+            "company": company,
+            "amount": amount,
+            "status": "Ready to send",
+            "createdAt": int(time.time()),
+        }
+        invoices.insert(0, invoice)
+        record["connectwiser_invoices"] = invoices[:200]
+        shops[shop] = record
+        save_shops(shops)
+        return self._json(201, {"invoice": invoice})
 
     def _admin(self, shop, token, payload):
         body = json.dumps({"query": payload["query"], "variables": payload.get("variables") or {}}).encode()

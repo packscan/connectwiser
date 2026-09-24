@@ -337,4 +337,43 @@ document.querySelectorAll('.segmented button').forEach(button => button.addEvent
 	renderTickets(query);
 }));
 document.querySelector('#projectsView .new-button')?.addEventListener('click', () => auditToast('New project form is ready'));
+const invoiceQueue = document.querySelector('.billing-queue');
+const invoiceList = document.createElement('div');
+invoiceList.id = 'invoiceList';
+invoiceQueue?.appendChild(invoiceList);
+const renderInvoices = invoices => {
+	if (!invoiceList) return;
+	invoiceList.innerHTML = invoices.map(invoice => `<div class="billing-row saved-invoice"><span class="company-logo coral-bg">$</span><span><b>${invoice.company} - ${invoice.title}</b><small>${invoice.status} · Invoice ${invoice.id}</small></span><strong>${Number(invoice.amount).toLocaleString('en-US',{style:'currency',currency:'USD'})}</strong></div>`).join('');
+};
+const loadInvoices = () => {
+	if (!window.PACKSCAN_HOSTED || !window.PACKSCAN_SHOP) return;
+	fetch('/api/connectwiser/invoices').then(response => response.ok ? response.json() : null).then(data => {
+		if (data && Array.isArray(data.invoices)) renderInvoices(data.invoices);
+	}).catch(() => {});
+};
+loadInvoices();
+document.getElementById('createInvoiceBtn').onclick = async () => {
+	const button = document.getElementById('createInvoiceBtn');
+	const amountText = document.getElementById('quoteTotal').textContent.replace(/[$,]/g, '');
+	const payload = {title: workflowState.title || document.getElementById('quoteTitle').textContent, company: workflowState.company || document.getElementById('quoteCompany').textContent, amount: Number(workflowState.amount || amountText)};
+	button.disabled = true;
+	button.textContent = 'Saving invoice...';
+	try {
+		if (window.PACKSCAN_HOSTED && window.PACKSCAN_SHOP) {
+			const response = await fetch('/api/connectwiser/invoices', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+			const result = await response.json();
+			if (!response.ok) throw new Error(result.error || 'Invoice could not be saved');
+			renderInvoices([result.invoice]);
+		} else {
+			workflowState.invoiceCreated = true;
+			saveWorkflow();
+		}
+		button.textContent = 'Invoice created';
+		auditToast('Invoice saved');
+	} catch (error) {
+		button.disabled = false;
+		button.textContent = 'Create invoice';
+		auditToast(error.message);
+	}
+};
 </script></body></html>
