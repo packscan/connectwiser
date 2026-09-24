@@ -120,7 +120,11 @@ document.getElementById('newQuoteBtn').addEventListener('click', () => {
 	document.getElementById('quoteCompany').textContent = 'Select a company';
 	document.getElementById('quoteTicket').textContent = 'not linked to a ticket';
 });
-document.getElementById('reviewBillingBtn').addEventListener('click', () => showView('billing'));
+document.getElementById('reviewBillingBtn').addEventListener('click', () => {
+	const queue = document.querySelector('.billing-queue');
+	queue?.scrollIntoView({behavior:'smooth', block:'center'});
+	auditToast('Ready-to-invoice queue opened');
+});
 document.getElementById('editQuoteBtn').addEventListener('click', () => {
 	const title = window.prompt('Quote name', document.getElementById('quoteTitle').textContent);
 	if (!title) return;
