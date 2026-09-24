@@ -186,6 +186,47 @@ document.getElementById('createQuoteBtn').onclick = event => {
 		saveWorkflow();
 	}
 	closeDrawer();
+	const renderAttention = () => {
+		document.getElementById('attentionList').innerHTML = tickets.slice(0,3).map(t=>`<button class="attention-row" data-ticket="${t.id}"><span class="priority ${t.priority.toLowerCase()}">${t.priority}</span><span><b>${t.title}</b><small>${t.company} · ${t.id}</small></span><span>-></span></button>`).join('');
+		document.querySelectorAll('.attention-row').forEach(row=>row.onclick=()=>openTicket(row.dataset.ticket));
+	};
+	const loadRemoteTickets = () => {
+		if (!window.PACKSCAN_HOSTED || !window.PACKSCAN_SHOP) return;
+		fetch('/api/connectwiser/tickets').then(response => response.ok ? response.json() : null).then(data => {
+			if (!data || !Array.isArray(data.tickets)) return;
+			tickets.splice(0, tickets.length, ...data.tickets, ...tickets);
+			renderTickets();
+			renderAttention();
+		}).catch(() => {});
+	};
+	loadRemoteTickets();
+	newTicketModal.querySelector('form').onsubmit = async event => {
+		event.preventDefault();
+		const values = Object.fromEntries(new FormData(event.currentTarget));
+		const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+		submitButton.disabled = true;
+		submitButton.textContent = 'Saving ticket...';
+		try {
+			let ticket;
+			if (window.PACKSCAN_HOSTED && window.PACKSCAN_SHOP) {
+				const response = await fetch('/api/connectwiser/tickets', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(values)});
+				const result = await response.json();
+				if (!response.ok) throw new Error(result.error || 'Ticket could not be saved');
+				ticket = result.ticket;
+			} else {
+				ticket = {id:'#'+(1053+tickets.length), title:values.title, company:values.company, assignee:'Unassigned', initials:'--', tone:'blue', priority:values.priority, status:'Open', updated:'Just now', description:values.description || 'No description provided.'};
+			}
+			tickets.unshift(ticket);
+			renderTickets();
+			renderAttention();
+			closeNewTicket(); showView('tickets'); openTicket(ticket.id);
+		} catch (error) {
+			auditToast(error.message);
+		} finally {
+			submitButton.disabled = false;
+			submitButton.textContent = 'Create ticket';
+		}
+	};
 	showView('quotes');
 };
 </script><script>
