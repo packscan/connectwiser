@@ -257,6 +257,52 @@ reviewQuoteButton.textContent = 'Review quote';
 invoiceButton.parentNode.insertBefore(reviewQuoteButton, invoiceButton);
 reviewQuoteButton.addEventListener('click', () => { showView('quotes'); auditToast('Quote review opened'); });
 const topButtons = document.querySelectorAll('.top-actions .icon-button');
+const settingsButton = document.createElement('button');
+settingsButton.className = 'nav-link';
+settingsButton.dataset.view = 'settings';
+settingsButton.innerHTML = '<i>gear</i>Settings';
+document.querySelector('.nav-bottom')?.prepend(settingsButton);
+settingsButton.addEventListener('click', () => showView('settings'));
+const settingsStyle = document.createElement('style');
+settingsStyle.textContent = '.settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:28px}.settings-card{padding:22px}.settings-detail{display:flex;justify-content:space-between;gap:18px;border-top:1px solid #e4e9e9;padding:13px 0;color:#73808b;font-size:12px}.settings-detail b{color:#18222d;text-align:right;overflow-wrap:anywhere}@media(max-width:700px){.settings-grid{grid-template-columns:1fr}}';
+document.head.appendChild(settingsStyle);
+const settingsView = document.createElement('div');
+settingsView.className = 'view placeholder-view';
+settingsView.id = 'settingsView';
+settingsView.innerHTML = '<p class="eyebrow">Workspace configuration</p><h1>Settings</h1><p class="subheading">Manage your connection and workflow storage.</p><div class="settings-grid"><section class="panel settings-card"><div class="panel-heading"><div><h2>Commerce connection</h2><p id="settingsConnectionText">Checking connection status...</p></div><span class="badge" id="settingsConnectionBadge">Checking</span></div><div class="settings-detail"><span>Store domain</span><b id="settingsShop">Not connected</b></div><div class="settings-detail"><span>Workflow storage</span><b id="settingsStorage">Browser demo storage</b></div><button class="new-button" id="settingsConnectBtn" type="button">Connect account</button></section><section class="panel settings-card"><div class="panel-heading"><div><h2>Product ownership</h2><p>Connect-Wiser.com service workspace</p></div></div><div class="settings-detail"><span>Developer and owner</span><b>PackScan</b></div><div class="settings-detail"><span>Environment</span><b id="settingsEnvironment">Production</b></div></section></div>';
+document.getElementById('content')?.appendChild(settingsView);
+const settingsConnectionText = document.getElementById('settingsConnectionText');
+const settingsConnectionBadge = document.getElementById('settingsConnectionBadge');
+const settingsShop = document.getElementById('settingsShop');
+const settingsStorage = document.getElementById('settingsStorage');
+const settingsConnectBtn = document.getElementById('settingsConnectBtn');
+if (window.PACKSCAN_SHOP) {
+	settingsConnectionText.textContent = 'Connected and ready to save live workflow data.';
+	settingsConnectionBadge.textContent = 'Connected';
+	settingsConnectionBadge.classList.add('open');
+	settingsShop.textContent = window.PACKSCAN_SHOP;
+	settingsStorage.textContent = 'PostgreSQL workspace storage';
+	settingsConnectBtn.textContent = 'Reconnect account';
+} else {
+	settingsConnectionText.textContent = 'Connect an account to save tickets, quotes, and billing across refreshes.';
+	settingsConnectionBadge.textContent = 'Not connected';
+	settingsConnectionBadge.classList.add('urgent');
+}
+settingsConnectBtn.addEventListener('click', () => {
+	const shop = window.PACKSCAN_SHOP || window.prompt('Enter your Shopify store domain, for example acme.myshopify.com');
+	if (!shop) return;
+	const normalizedShop = shop.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+	if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(normalizedShop)) {
+		auditToast('Enter a valid .myshopify.com store domain');
+		return;
+	}
+	window.location.href = `/auth?shop=${encodeURIComponent(normalizedShop)}`;
+});
+const originalShowView = showView;
+showView = function(view) {
+	originalShowView(view);
+	settingsButton.classList.toggle('active', view === 'settings');
+};
 if (window.PACKSCAN_HOSTED && !window.PACKSCAN_SHOP) {
 	const connectButton = document.createElement('button');
 	connectButton.className = 'ghost-button';
