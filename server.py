@@ -774,6 +774,10 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             status, data = self._admin(shop, token, {"query": mutation, "variables": variables})
             parsed = json.loads(data.decode("utf-8", "replace"))
+            raw_error = parsed.get("error")
+            raw_error_text = raw_error if isinstance(raw_error, str) else json.dumps(raw_error or "")
+            if status in (401, 403) or "invalid api key" in raw_error_text.lower() or "invalid access token" in raw_error_text.lower():
+                return self._json(401, {"error": "Shopify rejected the saved access token. Reconnect this store using the same Shopify app credentials configured in Render."})
             errors = parsed.get("errors") or parsed.get("data", {}).get("draftOrderCreate", {}).get("userErrors", [])
             if errors:
                 if isinstance(errors, (str, dict)):
