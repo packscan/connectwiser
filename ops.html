@@ -50,7 +50,10 @@ document.getElementById('approveQuoteBtn').onclick = async () => {
 			body: JSON.stringify({title: ticket.title, company: ticket.company, description: ticket.description, amount: 1250, ticketId: ticket.id})
 		});
 		const result = await response.json();
-		if (!response.ok) throw new Error(result.error || 'Could not create the billing record');
+		if (!response.ok) {
+			const detail = result.details ? `: ${typeof result.details === 'string' ? result.details : JSON.stringify(result.details)}` : '';
+			throw new Error((result.error || 'Could not create the billing record') + detail);
+		}
 		originalApproveQuote();
 		document.dispatchEvent(new CustomEvent('connectwiser:quote-approved'));
 		document.getElementById('toast').textContent = `${result.quote.name} added to billing`;

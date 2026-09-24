@@ -786,7 +786,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(502 if status < 400 else status, {"error": message})
             draft = parsed.get("data", {}).get("draftOrderCreate", {}).get("draftOrder")
             if not draft:
-                return self._json(502, {"error": "Shopify did not return a draft order"})
+                return self._json(502, {"error": "Shopify did not return a draft order", "details": parsed})
             return self._json(201, {"quote": draft, "provider": "shopify"})
         except Exception as exc:
             return self._json(502, {"error": "Shopify quote creation failed", "details": str(exc)})
