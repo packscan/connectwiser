@@ -372,7 +372,10 @@ loadInvoices();
 const createInvoice = async () => {
 	const button = document.getElementById('createInvoiceBtn');
 	if (button.disabled) {
-		auditToast('This invoice has already been created');
+		showView('billing');
+		const savedInvoice = document.querySelector('.saved-invoice');
+		savedInvoice?.scrollIntoView({behavior:'smooth', block:'center'});
+		auditToast('Invoice already created. See the saved invoice below.');
 		return;
 	}
 	const amountText = document.getElementById('quoteTotal').textContent.replace(/[$,]/g, '');
