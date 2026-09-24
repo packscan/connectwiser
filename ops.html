@@ -165,4 +165,29 @@ document.getElementById('createQuoteBtn').onclick = event => {
 	closeDrawer();
 	showView('quotes');
 };
+</script><script>
+const auditToast = message => {
+	const toast = document.getElementById('toast');
+	toast.textContent = message;
+	toast.classList.add('show');
+	setTimeout(() => toast.classList.remove('show'), 2200);
+};
+const topButtons = document.querySelectorAll('.top-actions .icon-button');
+topButtons[0]?.addEventListener('click', () => { showView('tickets'); document.getElementById('ticketSearch').focus(); });
+topButtons[1]?.addEventListener('click', () => auditToast('You are all caught up'));
+document.querySelector('.date-button')?.addEventListener('click', event => {
+	const ranges = ['Last 7 days', 'Last 30 days', 'This quarter'];
+	const current = ranges.indexOf(event.currentTarget.firstChild.textContent.trim());
+	event.currentTarget.firstChild.textContent = ` ${ranges[(current + 1) % ranges.length]} `;
+});
+document.querySelector('.section-grid .panel:nth-child(2) .icon-button')?.addEventListener('click', () => auditToast('Activity menu opened'));
+document.querySelector('.nav-bottom .nav-link')?.addEventListener('click', () => auditToast('Help center is available from your PackScan support workspace'));
+document.querySelectorAll('.segmented button').forEach(button => button.addEventListener('click', () => {
+	document.querySelectorAll('.segmented button').forEach(item => item.classList.remove('selected'));
+	button.classList.add('selected');
+	const label = button.textContent.trim().split(' ')[0];
+	const query = label === 'Unassigned' ? 'Unassigned' : label === 'My' ? 'Jordan Reed' : '';
+	renderTickets(query);
+}));
+document.querySelector('#projectsView .new-button')?.addEventListener('click', () => auditToast('New project form is ready'));
 </script></body></html>
