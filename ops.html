@@ -172,6 +172,14 @@ const auditToast = message => {
 	toast.classList.add('show');
 	setTimeout(() => toast.classList.remove('show'), 2200);
 };
+const invoiceButton = document.getElementById('createInvoiceBtn');
+const reviewQuoteButton = document.createElement('button');
+reviewQuoteButton.className = 'ghost-button';
+reviewQuoteButton.id = 'reviewQuoteBtn';
+reviewQuoteButton.type = 'button';
+reviewQuoteButton.textContent = 'Review quote';
+invoiceButton.parentNode.insertBefore(reviewQuoteButton, invoiceButton);
+reviewQuoteButton.addEventListener('click', () => { showView('quotes'); auditToast('Quote review opened'); });
 const topButtons = document.querySelectorAll('.top-actions .icon-button');
 topButtons[0]?.addEventListener('click', () => { showView('tickets'); document.getElementById('ticketSearch').focus(); });
 topButtons[1]?.addEventListener('click', () => auditToast('You are all caught up'));
